@@ -1,23 +1,9 @@
 // ==========================================
-// BSE RSS READER
+// BSE FINANCIAL RESULTS READER
 // ==========================================
 
-
-// ==========================================
-// CLOUDFLARE WORKER
-// ==========================================
-
-const WORKER_URL =
-  "https://bse-rss-reader.daksheshpatelin.workers.dev";
-
-
-const RESULTS_API =
-  WORKER_URL + "/bse-results";
-
-
-const WATCHLIST_API =
-  WORKER_URL + "/watchlist";
-
+const API_URL =
+  "https://bse-rss-reader.daksheshpatelin.workers.dev/bse-results";
 
 
 // ==========================================
@@ -26,8 +12,87 @@ const WATCHLIST_API =
 
 let allResults = [];
 
-let whitelist = [];
+let whitelist = JSON.parse(
+  localStorage.getItem("bseWhitelist") || "[]"
+);
 
+
+// ==========================================
+// COMMON BSE SCRIP MAP
+// ==========================================
+
+const COMMON_SCRIPS = {
+
+  "infosys": "500209",
+  "tcs": "532540",
+  "tata consultancy services": "532540",
+
+  "reliance": "500325",
+  "reliance industries": "500325",
+
+  "hdfc bank": "500180",
+  "icici bank": "532174",
+  "sbi": "500112",
+  "state bank of india": "500112",
+
+  "itc": "500875",
+
+  "hcl tech": "532281",
+  "hcl technologies": "532281",
+
+  "wipro": "507685",
+
+  "bharti airtel": "532454",
+  "airtel": "532454",
+
+  "larsen toubro": "500510",
+  "l&t": "500510",
+
+  "axis bank": "532215",
+
+  "kotak mahindra bank": "500247",
+
+  "maruti suzuki": "532500",
+  "maruti": "532500",
+
+  "tata motors": "500570",
+
+  "tata steel": "500470",
+
+  "sun pharma": "524715",
+  "sun pharmaceutical": "524715",
+
+  "asian paints": "500820",
+
+  "hindustan unilever": "500696",
+  "hul": "500696",
+
+  "bajaj finance": "500034",
+
+  "bajaj finserv": "532978",
+
+  "adani enterprises": "512599",
+
+  "adani ports": "532921",
+
+  "ntpc": "532555",
+
+  "ongc": "500312",
+
+  "power grid": "532898",
+  "power grid corporation": "532898",
+
+  "coal india": "533278",
+
+  "titan": "500114",
+
+  "ultratech cement": "532538",
+
+  "nestle india": "500790",
+
+  "britannia": "500825"
+
+};
 
 
 // ==========================================
@@ -35,248 +100,113 @@ let whitelist = [];
 // ==========================================
 
 const companyInput =
-  document.getElementById(
-    "companyInput"
-  );
-
+  document.getElementById("companyInput");
 
 const addBtn =
-  document.getElementById(
-    "addBtn"
-  );
-
+  document.getElementById("addBtn");
 
 const whitelistEl =
-  document.getElementById(
-    "whitelist"
-  );
-
+  document.getElementById("whitelist");
 
 const watchCount =
-  document.getElementById(
-    "watchCount"
-  );
-
+  document.getElementById("watchCount");
 
 const resultsEl =
-  document.getElementById(
-    "results"
-  );
-
+  document.getElementById("results");
 
 const emptyEl =
-  document.getElementById(
-    "empty"
-  );
-
+  document.getElementById("empty");
 
 const statusEl =
-  document.getElementById(
-    "status"
-  );
-
+  document.getElementById("status");
 
 const lastUpdatedEl =
-  document.getElementById(
-    "lastUpdated"
-  );
-
+  document.getElementById("lastUpdated");
 
 const searchInput =
-  document.getElementById(
-    "searchInput"
-  );
-
+  document.getElementById("searchInput");
 
 const resultTypeFilter =
-  document.getElementById(
-    "resultTypeFilter"
-  );
-
+  document.getElementById("resultTypeFilter");
 
 const refreshBtn =
-  document.getElementById(
-    "refreshBtn"
-  );
-
+  document.getElementById("refreshBtn");
 
 
 // ==========================================
-// CHECK WATCHED COMPANY
+// SAVE WHITELIST
 // ==========================================
 
-function isWatched(
-  scrip
-) {
+function saveWhitelist() {
 
-  return whitelist.some(
-    item =>
-      String(item.scrip) ===
-      String(scrip)
+  localStorage.setItem(
+    "bseWhitelist",
+    JSON.stringify(whitelist)
   );
 
 }
 
 
-
 // ==========================================
-// LOAD WATCHLIST
-// ==========================================
-
-async function loadWatchlist() {
-
-  try {
-
-    const response =
-      await fetch(
-        WATCHLIST_API +
-        "?t=" +
-        Date.now(),
-        {
-          method: "GET",
-          cache: "no-store"
-        }
-      );
-
-
-    if (!response.ok) {
-
-      throw new Error(
-        "HTTP " +
-        response.status
-      );
-
-    }
-
-
-    const data =
-      await response.json();
-
-
-    if (!data.ok) {
-
-      throw new Error(
-        data.error ||
-        "Could not load watchlist"
-      );
-
-    }
-
-
-    whitelist =
-      Array.isArray(
-        data.watchlist
-      )
-        ? data.watchlist
-        : [];
-
-
-    renderWhitelist();
-
-    renderResults();
-
-
-  } catch (error) {
-
-    console.error(
-      "Watchlist load error:",
-      error
-    );
-
-
-    statusEl.textContent =
-      "Could not load Watchlist";
-
-  }
-
-}
-
-
-
-// ==========================================
-// DISPLAY WATCHLIST
+// DISPLAY WHITELIST
 // ==========================================
 
 function renderWhitelist() {
 
-  whitelistEl.innerHTML =
-    "";
-
+  whitelistEl.innerHTML = "";
 
   watchCount.textContent =
     whitelist.length;
 
 
-  if (
-    whitelist.length === 0
-  ) {
+  if (whitelist.length === 0) {
 
     whitelistEl.innerHTML =
       '<span style="color:#777;font-size:13px">' +
-      'No companies in Watchlist yet.' +
+      'No companies whitelisted yet.' +
       '</span>';
 
     return;
-
   }
 
 
-  whitelist.forEach(
-    item => {
+  whitelist.forEach(item => {
 
-      const div =
-        document.createElement(
-          "div"
-        );
+    const div =
+      document.createElement("div");
 
-
-      div.className =
-        "watch-item";
+    div.className =
+      "watch-item";
 
 
-      div.innerHTML = `
-
-        <span>
-
-          ⭐
-
-          ${escapeHtml(
-            item.name
-          )}
-
-          (${escapeHtml(
-            item.scrip
-          )})
-
-        </span>
+    const scriptText =
+      item.scrip
+        ? ` (${item.scrip})`
+        : " (name match)";
 
 
-        <button
+    div.innerHTML =
+      `
+      <span>
+        ${escapeHtml(item.name)}
+        ${escapeHtml(scriptText)}
+      </span>
 
-          class="remove-watch"
-
-          data-scrip="${escapeAttribute(
-            item.scrip
-          )}"
-
-        >
-
-          ×
-
-        </button>
-
+      <button
+        class="remove-watch"
+        data-scrip="${escapeAttribute(item.scrip || "")}"
+        data-name="${escapeAttribute(item.name)}"
+      >
+        ×
+      </button>
       `;
 
 
-      whitelistEl.appendChild(
-        div
-      );
+    whitelistEl.appendChild(div);
 
-    }
-  );
+  });
 
 }
-
 
 
 // ==========================================
@@ -293,9 +223,9 @@ companyInput.addEventListener(
   "keydown",
   function(event) {
 
-    if (
-      event.key === "Enter"
-    ) {
+    if (event.key === "Enter") {
+
+      event.preventDefault();
 
       addCompany();
 
@@ -305,14 +235,15 @@ companyInput.addEventListener(
 );
 
 
-
-async function addCompany() {
+function addCompany() {
 
   const value =
     companyInput.value.trim();
 
 
   if (!value) {
+
+    alert("Enter a company name or BSE scrip.");
 
     return;
 
@@ -323,75 +254,111 @@ async function addCompany() {
     value.toLowerCase();
 
 
-  /*
-   * Find company or scrip
-   * in current BSE feed.
-   */
+  // ----------------------------------------
+  // 1. Try current RSS feed
+  // ----------------------------------------
 
-  const matches =
-    allResults.filter(
-      item => {
+  const currentMatch =
+    allResults.find(item => {
 
-        const company =
-          String(
-            item.company || ""
-          ).toLowerCase();
+      const company =
+        String(item.company || "")
+          .toLowerCase();
 
+      const scrip =
+        String(item.scrip || "");
 
-        const scrip =
-          String(
-            item.scrip || ""
-          );
+      return (
+        company.includes(searchValue) ||
+        scrip === value
+      );
 
-
-        return (
-
-          company.includes(
-            searchValue
-          ) ||
-
-          scrip === value
-
-        );
-
-      }
-    );
+    });
 
 
-  if (
-    matches.length === 0
-  ) {
+  // ----------------------------------------
+  // 2. Try known BSE scrip list
+  // ----------------------------------------
 
-    alert(
-      "Company or BSE scrip was not found in the current BSE feed."
-    );
+  let guessedScrip = "";
 
-    return;
+
+  if (!currentMatch) {
+
+    guessedScrip =
+      COMMON_SCRIPS[searchValue] || "";
 
   }
 
 
-  const item =
-    matches[0];
+  // ----------------------------------------
+  // 3. If input itself looks like scrip
+  // ----------------------------------------
 
+  if (
+    !currentMatch &&
+    !guessedScrip &&
+    /^\d{6}$/.test(value)
+  ) {
+
+    guessedScrip = value;
+
+  }
+
+
+  // ----------------------------------------
+  // Determine saved company name
+  // ----------------------------------------
+
+  let companyName = value;
+
+
+  if (currentMatch) {
+
+    companyName =
+      currentMatch.company;
+
+    guessedScrip =
+      currentMatch.scrip;
+
+  }
+
+
+  // ----------------------------------------
+  // Check duplicate
+  // ----------------------------------------
 
   const exists =
-    whitelist.some(
-      watch =>
-        String(
-          watch.scrip
-        ) ===
-        String(
-          item.scrip
-        )
-    );
+    whitelist.some(item => {
+
+      if (
+        guessedScrip &&
+        item.scrip
+      ) {
+
+        return (
+          String(item.scrip) ===
+          String(guessedScrip)
+        );
+
+      }
+
+
+      return (
+        String(item.name)
+          .toLowerCase() ===
+        String(companyName)
+          .toLowerCase()
+      );
+
+    });
 
 
   if (exists) {
 
     alert(
-      item.company +
-      " is already in your Watchlist."
+      companyName +
+      " is already whitelisted."
     );
 
     return;
@@ -399,108 +366,50 @@ async function addCompany() {
   }
 
 
-  addBtn.disabled =
-    true;
+  // ----------------------------------------
+  // Save watchlist entry
+  // ----------------------------------------
+
+  whitelist.push({
+
+    name: companyName,
+
+    scrip: guessedScrip || "",
+
+    addedAt: Date.now()
+
+  });
 
 
-  try {
+  saveWhitelist();
 
-    const response =
-      await fetch(
-        WATCHLIST_API,
-        {
+  renderWhitelist();
 
-          method: "POST",
+  companyInput.value = "";
 
-          headers: {
-            "Content-Type":
-              "application/json"
-          },
-
-          body:
-            JSON.stringify({
-
-              name:
-                item.company,
-
-              scrip:
-                item.scrip
-
-            })
-
-        }
-      );
+  renderResults();
 
 
-    if (!response.ok) {
+  // ----------------------------------------
+  // Inform user what was saved
+  // ----------------------------------------
 
-      throw new Error(
-        "HTTP " +
-        response.status
-      );
-
-    }
-
-
-    const data =
-      await response.json();
-
-
-    if (!data.ok) {
-
-      throw new Error(
-        data.error ||
-        "Could not add company"
-      );
-
-    }
-
-
-    whitelist =
-      Array.isArray(
-        data.watchlist
-      )
-        ? data.watchlist
-        : [];
-
-
-    companyInput.value =
-      "";
-
-
-    renderWhitelist();
-
-    renderResults();
-
+  if (guessedScrip) {
 
     statusEl.textContent =
-      item.company +
-      " added to Watchlist";
+      companyName +
+      " added to watchlist — BSE " +
+      guessedScrip;
 
+  } else {
 
-  } catch (error) {
-
-    console.error(
-      "Add watchlist error:",
-      error
-    );
-
-
-    alert(
-      "Could not add company to Watchlist.\n\n" +
-      error.message
-    );
-
-
-  } finally {
-
-    addBtn.disabled =
-      false;
+    statusEl.textContent =
+      companyName +
+      " added — future results will be matched by company name";
 
   }
 
 }
-
 
 
 // ==========================================
@@ -509,7 +418,7 @@ async function addCompany() {
 
 whitelistEl.addEventListener(
   "click",
-  async function(event) {
+  function(event) {
 
     if (
       !event.target.classList.contains(
@@ -525,103 +434,124 @@ whitelistEl.addEventListener(
     const scrip =
       event.target.dataset.scrip;
 
-
-    if (!scrip) {
-
-      return;
-
-    }
+    const name =
+      event.target.dataset.name;
 
 
-    if (
-      !confirm(
-        "Remove this company from your Watchlist?"
-      )
-    ) {
+    whitelist =
+      whitelist.filter(item => {
 
-      return;
+        if (
+          scrip &&
+          item.scrip
+        ) {
 
-    }
+          return (
+            String(item.scrip) !==
+            String(scrip)
+          );
+
+        }
 
 
-    try {
-
-      const response =
-        await fetch(
-
-          WATCHLIST_API +
-          "?scrip=" +
-          encodeURIComponent(
-            scrip
-          ),
-
-          {
-            method:
-              "DELETE"
-          }
-
+        return (
+          String(item.name) !==
+          String(name)
         );
 
-
-      if (!response.ok) {
-
-        throw new Error(
-          "HTTP " +
-          response.status
-        );
-
-      }
+      });
 
 
-      const data =
-        await response.json();
+    saveWhitelist();
 
+    renderWhitelist();
 
-      if (!data.ok) {
-
-        throw new Error(
-          data.error ||
-          "Could not remove company"
-        );
-
-      }
-
-
-      whitelist =
-        Array.isArray(
-          data.watchlist
-        )
-          ? data.watchlist
-          : [];
-
-
-      renderWhitelist();
-
-      renderResults();
-
-
-      statusEl.textContent =
-        "Company removed from Watchlist";
-
-
-    } catch (error) {
-
-      console.error(
-        "Remove watchlist error:",
-        error
-      );
-
-
-      alert(
-        "Could not remove company.\n\n" +
-        error.message
-      );
-
-    }
+    renderResults();
 
   }
 );
 
+
+// ==========================================
+// CHECK WHETHER RESULT IS WHITELISTED
+// ==========================================
+
+function isWhitelisted(item) {
+
+  const itemScrip =
+    String(item.scrip || "");
+
+  const itemCompany =
+    String(item.company || "")
+      .trim()
+      .toLowerCase();
+
+
+  return whitelist.some(watch => {
+
+    const watchScrip =
+      String(watch.scrip || "");
+
+    const watchName =
+      String(watch.name || "")
+        .trim()
+        .toLowerCase();
+
+
+    // Prefer exact BSE scrip match
+
+    if (
+      watchScrip &&
+      itemScrip
+    ) {
+
+      if (
+        watchScrip ===
+        itemScrip
+      ) {
+
+        return true;
+
+      }
+
+    }
+
+
+    // Fallback to company-name match
+
+    if (
+      watchName &&
+      itemCompany
+    ) {
+
+      if (
+        itemCompany ===
+        watchName
+      ) {
+
+        return true;
+
+      }
+
+
+      if (
+        itemCompany.includes(
+          watchName
+        )
+      ) {
+
+        return true;
+
+      }
+
+    }
+
+
+    return false;
+
+  });
+
+}
 
 
 // ==========================================
@@ -634,27 +564,20 @@ async function loadResults() {
     "Loading BSE results...";
 
 
-  refreshBtn.disabled =
-    true;
+  refreshBtn.disabled = true;
 
 
   try {
 
     const response =
       await fetch(
-
-        RESULTS_API +
+        API_URL +
         "?t=" +
         Date.now(),
-
         {
-          method:
-            "GET",
-
-          cache:
-            "no-store"
+          method: "GET",
+          cache: "no-store"
         }
-
       );
 
 
@@ -683,22 +606,27 @@ async function loadResults() {
 
 
     allResults =
-      Array.isArray(
-        data.items
-      )
+      Array.isArray(data.items)
         ? data.items
         : [];
 
 
+    const watchedCount =
+      allResults.filter(
+        isWhitelisted
+      ).length;
+
+
     statusEl.textContent =
       allResults.length +
-      " BSE results received";
+      " BSE results received • " +
+      watchedCount +
+      " matching watchlist";
 
 
     lastUpdatedEl.textContent =
       "Updated " +
-      new Date()
-        .toLocaleTimeString();
+      new Date().toLocaleTimeString();
 
 
     renderResults();
@@ -720,8 +648,7 @@ async function loadResults() {
       error.message;
 
 
-    resultsEl.innerHTML =
-      "";
+    resultsEl.innerHTML = "";
 
 
     emptyEl.classList.remove(
@@ -732,16 +659,13 @@ async function loadResults() {
     emptyEl.textContent =
       "Could not connect to BSE Worker.";
 
-
   } finally {
 
-    refreshBtn.disabled =
-      false;
+    refreshBtn.disabled = false;
 
   }
 
 }
-
 
 
 // ==========================================
@@ -761,117 +685,70 @@ function getFilteredResults() {
 
 
   /*
-   * IMPORTANT:
+   * Show ALL BSE results.
    *
-   * ALL BSE RESULTS ARE SHOWN.
-   *
-   * Watchlist is NOT a visibility filter.
-   *
-   * It is used for:
-   *
-   * - ⭐ marking
-   * - alerts
-   * - notifications
-   * - special watchlist bundle
+   * Whitelisted companies are marked
+   * separately instead of hiding other
+   * results.
    */
 
-
   let results =
-    [
-      ...allResults
-    ];
-
+    [...allResults];
 
 
   // ----------------------------------------
-  // RESULT TYPE
+  // Result type
   // ----------------------------------------
 
   if (
-    resultType !== "all"
+    resultType !==
+    "all"
   ) {
 
     results =
       results.filter(
         item =>
-          String(
-            item.resultType || ""
-          ).toLowerCase() ===
-          String(
-            resultType
-          ).toLowerCase()
+          item.resultType ===
+          resultType
       );
 
   }
 
 
-
   // ----------------------------------------
-  // SEARCH
+  // Search
   // ----------------------------------------
 
   if (search) {
 
     results =
-      results.filter(
-        item => {
+      results.filter(item => {
 
-          const company =
-            String(
-              item.company || ""
-            ).toLowerCase();
+        const company =
+          String(item.company || "")
+            .toLowerCase();
 
+        const scrip =
+          String(item.scrip || "")
+            .toLowerCase();
 
-          const scrip =
-            String(
-              item.scrip || ""
-            ).toLowerCase();
+        const periodStart =
+          String(item.periodStart || "")
+            .toLowerCase();
 
-
-          const periodStart =
-            String(
-              item.periodStart || ""
-            ).toLowerCase();
+        const periodEnd =
+          String(item.periodEnd || "")
+            .toLowerCase();
 
 
-          const periodEnd =
-            String(
-              item.periodEnd || ""
-            ).toLowerCase();
+        return (
+          company.includes(search) ||
+          scrip.includes(search) ||
+          periodStart.includes(search) ||
+          periodEnd.includes(search)
+        );
 
-
-          const resultTypeText =
-            String(
-              item.resultType || ""
-            ).toLowerCase();
-
-
-          return (
-
-            company.includes(
-              search
-            ) ||
-
-            scrip.includes(
-              search
-            ) ||
-
-            periodStart.includes(
-              search
-            ) ||
-
-            periodEnd.includes(
-              search
-            ) ||
-
-            resultTypeText.includes(
-              search
-            )
-
-          );
-
-        }
-      );
+      });
 
   }
 
@@ -881,15 +758,13 @@ function getFilteredResults() {
 }
 
 
-
 // ==========================================
 // DISPLAY RESULTS
 // ==========================================
 
 function renderResults() {
 
-  resultsEl.innerHTML =
-    "";
+  resultsEl.innerHTML = "";
 
 
   const results =
@@ -905,19 +780,8 @@ function renderResults() {
     );
 
 
-    if (
-      allResults.length === 0
-    ) {
-
-      emptyEl.textContent =
-        "No BSE results available.";
-
-    } else {
-
-      emptyEl.textContent =
-        "No results match the current filter.";
-
-    }
+    emptyEl.textContent =
+      "No BSE results found.";
 
 
     return;
@@ -930,152 +794,95 @@ function renderResults() {
   );
 
 
-  results.forEach(
-    item => {
+  results.forEach(item => {
 
-      const card =
-        document.createElement(
-          "div"
-        );
+    const card =
+      document.createElement("div");
 
 
-      card.className =
-        "result-card";
+    card.className =
+      "result-card";
 
 
-      const watched =
-        isWatched(
-          item.scrip
-        );
+    const watched =
+      isWhitelisted(item);
 
 
-      const watchedBadge =
-        watched
+    if (watched) {
 
-          ? `
+      card.style.border =
+        "2px solid #198754";
 
-            <span
-
-              class="badge"
-
-              style="
-                background:#fff3cd;
-                color:#856404
-              "
-
-            >
-
-              ⭐ WATCHED
-
-            </span>
-
-          `
-
-          : "";
-
-
-      card.innerHTML = `
-
-        <div class="company">
-
-          ${watched ? "⭐ " : ""}
-
-          ${escapeHtml(
-            item.company
-          )}
-
-        </div>
-
-
-        <div class="scrip">
-
-          BSE:
-          ${escapeHtml(
-            item.scrip
-          )}
-
-        </div>
-
-
-        <div class="meta">
-
-          ${watchedBadge}
-
-
-          <span class="badge">
-
-            ${escapeHtml(
-              item.resultType
-            )}
-
-          </span>
-
-
-          <span class="badge">
-
-            ${escapeHtml(
-              item.basis
-            )}
-
-          </span>
-
-
-          <span class="badge">
-
-            ${escapeHtml(
-              item.indAs
-            )}
-
-          </span>
-
-        </div>
-
-
-        <div class="period">
-
-          ${escapeHtml(
-            item.periodStart
-          )}
-
-          →
-
-          ${escapeHtml(
-            item.periodEnd
-          )}
-
-        </div>
-
-
-        <a
-
-          class="open-btn"
-
-          href="${escapeAttribute(
-            item.link
-          )}"
-
-          target="_blank"
-
-          rel="noopener noreferrer"
-
-        >
-
-          Open BSE Result
-
-        </a>
-
-      `;
-
-
-      resultsEl.appendChild(
-        card
-      );
+      card.style.background =
+        "#f1fff6";
 
     }
-  );
+
+
+    card.innerHTML = `
+
+      ${
+        watched
+          ? `
+            <div style="
+              color:#198754;
+              font-size:12px;
+              font-weight:bold;
+              margin-bottom:6px;
+            ">
+              ⭐ WATCHLIST RESULT
+            </div>
+          `
+          : ""
+      }
+
+      <div class="company">
+        ${escapeHtml(item.company)}
+      </div>
+
+      <div class="scrip">
+        BSE: ${escapeHtml(item.scrip)}
+      </div>
+
+      <div class="meta">
+
+        <span class="badge">
+          ${escapeHtml(item.resultType)}
+        </span>
+
+        <span class="badge">
+          ${escapeHtml(item.basis)}
+        </span>
+
+        <span class="badge">
+          ${escapeHtml(item.indAs)}
+        </span>
+
+      </div>
+
+      <div class="period">
+        ${escapeHtml(item.periodStart)}
+        →
+        ${escapeHtml(item.periodEnd)}
+      </div>
+
+      <a
+        class="open-btn"
+        href="${escapeAttribute(item.link)}"
+        target="_blank"
+        rel="noopener noreferrer"
+      >
+        Open BSE Result
+      </a>
+
+    `;
+
+
+    resultsEl.appendChild(card);
+
+  });
 
 }
-
 
 
 // ==========================================
@@ -1094,81 +901,53 @@ resultTypeFilter.addEventListener(
 );
 
 
-
 // ==========================================
-// REFRESH
+// REFRESH BUTTON
 // ==========================================
 
 refreshBtn.addEventListener(
   "click",
-  async function() {
-
-    await loadWatchlist();
-
-    await loadResults();
-
-  }
+  loadResults
 );
 
 
-
 // ==========================================
-// AUTOMATIC FRONTEND REFRESH
+// AUTOMATIC REFRESH
 //
-// Runs only while webpage is open.
-//
-// Background monitoring will be handled
-// separately by Cloudflare Worker.
+// Currently every 5 minutes.
+// We will later move the real alert
+// monitoring to the Cloudflare Worker.
 // ==========================================
 
 setInterval(
-
-  async function() {
-
-    await loadWatchlist();
-
-    await loadResults();
-
-  },
-
+  loadResults,
   5 * 60 * 1000
-
 );
 
 
-
 // ==========================================
-// SECURITY
+// HTML SECURITY
 // ==========================================
 
-function escapeHtml(
-  value
-) {
+function escapeHtml(value) {
 
-  return String(
-    value ?? ""
-  )
-
+  return String(value ?? "")
     .replace(
       /&/g,
       "&amp;"
     )
-
     .replace(
       /</g,
       "&lt;"
     )
-
     .replace(
       />/g,
       "&gt;"
     )
-
     .replace(
       /"/g,
       "&quot;"
     )
-
     .replace(
       /'/g,
       "&#039;"
@@ -1177,30 +956,21 @@ function escapeHtml(
 }
 
 
+function escapeAttribute(value) {
 
-function escapeAttribute(
-  value
-) {
-
-  return String(
-    value ?? ""
-  )
-
+  return String(value ?? "")
     .replace(
       /&/g,
       "&amp;"
     )
-
     .replace(
       /"/g,
       "&quot;"
     )
-
     .replace(
       /</g,
       "&lt;"
     )
-
     .replace(
       />/g,
       "&gt;"
@@ -1209,20 +979,10 @@ function escapeAttribute(
 }
 
 
-
 // ==========================================
-// START
+// START APPLICATION
 // ==========================================
 
-async function startApp() {
+renderWhitelist();
 
-  renderWhitelist();
-
-  await loadWatchlist();
-
-  await loadResults();
-
-}
-
-
-startApp();
+loadResults();
