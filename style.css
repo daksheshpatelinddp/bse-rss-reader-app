@@ -1,566 +1,844 @@
-/* ==========================================
-   GLOBAL
-   ========================================== */
-
 * {
   box-sizing: border-box;
 }
 
 
+html,
 body {
-
   margin: 0;
-
-  background: #f3f5f7;
-
-  color: #17202a;
-
-  font-family:
-    Arial,
-    sans-serif;
-
+  padding: 0;
 }
 
 
+body {
+  font-family:
+    Arial,
+    Helvetica,
+    sans-serif;
 
-/* ==========================================
-   TOP BAR
-   ========================================== */
+  background: #f4f6f8;
+
+  color: #202124;
+}
+
+
+button,
+input,
+select {
+  font: inherit;
+}
+
+
+/* ============================================================
+   HEADER
+   ============================================================ */
 
 .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 20;
+
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  gap: 12px;
+
+  padding: 14px 16px;
 
   background: #ffffff;
 
-  border-bottom:
-    1px solid #ddd;
+  border-bottom: 1px solid #dfe3e8;
 
-  padding:
-    14px 16px;
-
-  display: flex;
-
-  align-items: center;
-
-  justify-content:
-    space-between;
-
-  gap: 10px;
-
+  box-shadow:
+    0 1px 4px rgba(0, 0, 0, 0.08);
 }
 
 
-h1 {
-
+.topbar h1 {
   margin: 0;
 
-  font-size: 21px;
+  font-size: 20px;
 
+  line-height: 1.2;
 }
 
 
 .subtitle {
+  margin-top: 4px;
 
-  margin-top: 3px;
-
-  color: #777;
+  color: #6b7280;
 
   font-size: 13px;
-
 }
 
 
 .refresh-btn {
+  border: 1px solid #cfd5dc;
 
-  border: 0;
+  background: #ffffff;
 
   border-radius: 8px;
 
-  padding:
-    9px 13px;
-
-  background: #1f6feb;
-
-  color: white;
-
-  font-size: 14px;
+  padding: 8px 12px;
 
   cursor: pointer;
 
+  white-space: nowrap;
 }
 
 
-.refresh-btn:disabled {
-
-  opacity: 0.6;
-
-  cursor:
-    not-allowed;
-
+.refresh-btn:hover {
+  background: #f1f3f5;
 }
 
 
 
-/* ==========================================
+/* ============================================================
    MAIN
-   ========================================== */
+   ============================================================ */
 
 main {
+  width: 100%;
 
-  max-width: 900px;
+  max-width: 1100px;
 
-  margin: auto;
+  margin: 0 auto;
 
-  padding: 12px;
-
+  padding: 14px;
 }
 
 
 
-/* ==========================================
+/* ============================================================
    PANELS
-   ========================================== */
+   ============================================================ */
 
 .panel {
+  background: #ffffff;
 
-  background: white;
-
-  border:
-    1px solid #ddd;
+  border: 1px solid #e0e4e8;
 
   border-radius: 10px;
 
   padding: 14px;
 
   margin-bottom: 12px;
-
 }
 
 
 .panel-title {
-
   display: flex;
 
   align-items: center;
 
-  justify-content:
-    space-between;
+  justify-content: space-between;
+
+  gap: 10px;
 
   margin-bottom: 12px;
-
 }
 
 
 .panel-title h2 {
-
   margin: 0;
 
-  font-size: 17px;
-
+  font-size: 16px;
 }
 
 
-#watchCount {
+.panel-title span {
+  display: inline-flex;
 
-  background: #eef4ff;
+  align-items: center;
 
-  color: #1f6feb;
+  justify-content: center;
 
-  padding:
-    4px 8px;
+  min-width: 28px;
+
+  padding: 3px 8px;
 
   border-radius: 20px;
 
+  background: #eef1f4;
+
   font-size: 12px;
 
+  font-weight: 700;
 }
 
 
 
-/* ==========================================
-   ADD COMPANY
-   ========================================== */
+/* ============================================================
+   WATCHLIST
+   ============================================================ */
 
 .add-row {
-
   display: flex;
 
   gap: 8px;
-
 }
 
 
-input,
-select {
+.add-row input {
+  flex: 1;
 
-  width: 100%;
+  min-width: 0;
 
-  border:
-    1px solid #ccc;
+  border: 1px solid #cfd5dc;
 
   border-radius: 8px;
 
-  padding: 10px;
+  padding: 10px 11px;
 
-  background: white;
-
-  font-size: 14px;
-
+  outline: none;
 }
 
 
-input:focus,
-select:focus {
-
-  outline: none;
-
-  border-color:
-    #1f6feb;
-
+.add-row input:focus {
+  border-color: #6b7280;
 }
 
 
 .add-row button {
-
   border: 0;
 
   border-radius: 8px;
 
-  background: #198754;
+  padding: 10px 15px;
 
-  color: white;
+  background: #202124;
 
-  padding:
-    0 16px;
-
-  font-size: 14px;
+  color: #ffffff;
 
   cursor: pointer;
-
 }
 
-
-.add-row button:disabled {
-
-  opacity: 0.6;
-
-  cursor:
-    not-allowed;
-
-}
-
-
-
-/* ==========================================
-   WATCHLIST
-   ========================================== */
 
 .whitelist {
-
-  margin-top: 12px;
-
   display: flex;
 
   flex-wrap: wrap;
 
   gap: 7px;
 
+  margin-top: 10px;
 }
 
 
 .watch-item {
-
   display: flex;
 
   align-items: center;
 
-  gap: 6px;
+  gap: 7px;
 
-  background: #eef4ff;
+  padding: 6px 8px 6px 10px;
 
-  border:
-    1px solid #cddfff;
+  border: 1px solid #d9dee4;
 
   border-radius: 20px;
 
-  padding:
-    6px 9px;
+  background: #f8f9fa;
 
   font-size: 13px;
-
 }
 
 
 .remove-watch {
+  width: 22px;
 
-  border: 0;
-
-  background:
-    transparent;
-
-  color: #d00;
-
-  font-weight: bold;
-
-  cursor: pointer;
+  height: 22px;
 
   padding: 0;
 
+  border: 0;
+
+  border-radius: 50%;
+
+  background: #e5e7eb;
+
+  cursor: pointer;
+
+  line-height: 22px;
+}
+
+
+.remove-watch:hover {
+  background: #d1d5db;
+}
+
+
+.muted {
+  color: #7b8189;
+
+  font-size: 13px;
 }
 
 
 
-/* ==========================================
-   FILTERS
-   ========================================== */
+/* ============================================================
+   ALERT PANEL
+   ============================================================ */
 
-.filter-row {
+.alert-panel {
+  border-color: #e5c96b;
 
-  display: flex;
-
-  gap: 8px;
-
+  background: #fffdf4;
 }
 
 
-.filter-row input {
+.category-button.special {
+  border-color: #e5c96b;
 
-  flex: 1;
-
-}
-
-
-.filter-row select {
-
-  width: 160px;
-
+  background: #fff8d8;
 }
 
 
 
-/* ==========================================
-   STATUS
-   ========================================== */
+/* ============================================================
+   CATEGORY LIST
+   ============================================================ */
 
-.status-bar {
-
-  display: flex;
-
-  justify-content:
-    space-between;
-
-  gap: 10px;
-
-  padding:
-    5px 3px 10px;
-
-  color: #666;
-
-  font-size: 12px;
-
-}
-
-
-
-/* ==========================================
-   RESULTS
-   ========================================== */
-
-.results {
-
-  display: flex;
-
-  flex-direction: column;
-
-  gap: 10px;
-
-}
-
-
-.result-card {
-
-  background: white;
-
-  border:
-    1px solid #ddd;
-
-  border-radius: 10px;
-
-  padding: 14px;
-
-}
-
-
-.company {
-
-  font-size: 17px;
-
-  font-weight: bold;
-
-}
-
-
-.scrip {
-
-  color: #777;
-
-  font-size: 12px;
-
-  margin-top: 3px;
-
-}
-
-
-.meta {
-
+.category-list {
   display: flex;
 
   flex-wrap: wrap;
 
-  gap: 6px;
-
-  margin-top: 10px;
-
+  gap: 8px;
 }
 
 
-.badge {
+.category-button {
+  display: inline-flex;
 
-  display: inline-block;
+  align-items: center;
 
-  border-radius: 5px;
+  justify-content: space-between;
 
-  padding:
-    4px 7px;
+  gap: 10px;
 
-  background: #f0f0f0;
+  min-height: 38px;
 
-  font-size: 12px;
+  padding: 8px 11px;
 
+  border: 1px solid #d6dbe1;
+
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  color: #252a31;
+
+  cursor: pointer;
+
+  transition:
+    background 0.15s,
+    border-color 0.15s;
 }
 
 
-.period {
+.category-button:hover {
+  background: #f1f3f5;
 
-  margin-top: 9px;
-
-  font-size: 13px;
-
-  color: #555;
-
+  border-color: #b9c0c8;
 }
 
 
-.open-btn {
-
-  display: inline-block;
-
-  margin-top: 12px;
-
-  padding:
-    9px 12px;
-
-  background: #1f6feb;
-
-  color: white;
-
-  text-decoration: none;
-
-  border-radius: 7px;
-
-  font-size: 13px;
-
-}
-
-
-.open-btn:hover {
-
-  opacity: 0.9;
-
-}
-
-
-
-/* ==========================================
-   EMPTY MESSAGE
-   ========================================== */
-
-.empty {
-
-  background: white;
-
-  border:
-    1px dashed #bbb;
+.category-button b {
+  padding: 2px 6px;
 
   border-radius: 10px;
 
-  padding: 25px;
+  background: #eef1f4;
+
+  font-size: 11px;
+}
+
+
+.category-button.active {
+  background: #202124;
+
+  border-color: #202124;
+
+  color: #ffffff;
+}
+
+
+.category-button.active b {
+  background: #ffffff;
+
+  color: #202124;
+}
+
+
+.all-category {
+  font-weight: 700;
+}
+
+
+
+/* ============================================================
+   CURRENT FEED
+   ============================================================ */
+
+.current-feed {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 12px;
+}
+
+
+.feed-title {
+  font-size: 18px;
+
+  font-weight: 700;
+}
+
+
+.feed-count {
+  margin-top: 3px;
+
+  color: #737981;
+
+  font-size: 12px;
+}
+
+
+.all-btn {
+  border: 1px solid #cfd5dc;
+
+  border-radius: 8px;
+
+  background: #ffffff;
+
+  padding: 8px 11px;
+
+  cursor: pointer;
+
+  white-space: nowrap;
+}
+
+
+
+/* ============================================================
+   FILTERS
+   ============================================================ */
+
+.filter-row {
+  display: flex;
+
+  gap: 8px;
+}
+
+
+.filter-row input,
+.filter-row select {
+  min-width: 0;
+
+  border: 1px solid #cfd5dc;
+
+  border-radius: 8px;
+
+  padding: 9px 10px;
+
+  background: #ffffff;
+
+  outline: none;
+}
+
+
+.filter-row input {
+  flex: 1;
+}
+
+
+.filter-row select {
+  width: 260px;
+}
+
+
+.filter-row input:focus,
+.filter-row select:focus {
+  border-color: #6b7280;
+}
+
+
+
+/* ============================================================
+   STATUS
+   ============================================================ */
+
+.status-bar {
+  display: flex;
+
+  justify-content: space-between;
+
+  gap: 10px;
+
+  margin: 8px 2px 12px;
+
+  color: #707780;
+
+  font-size: 12px;
+}
+
+
+
+/* ============================================================
+   ANNOUNCEMENTS
+   ============================================================ */
+
+.results {
+  display: flex;
+
+  flex-direction: column;
+
+  gap: 9px;
+}
+
+
+.announcement-card {
+  background: #ffffff;
+
+  border: 1px solid #dfe3e8;
+
+  border-radius: 10px;
+
+  padding: 13px;
+}
+
+
+.announcement-card:hover {
+  border-color: #bfc5cc;
+}
+
+
+.announcement-top {
+  display: flex;
+
+  align-items: flex-start;
+
+  justify-content: space-between;
+
+  gap: 10px;
+}
+
+
+.company {
+  font-size: 14px;
+
+  font-weight: 700;
+}
+
+
+.scrip {
+  display: inline-block;
+
+  margin-left: 6px;
+
+  padding: 2px 5px;
+
+  border-radius: 4px;
+
+  background: #eef1f4;
+
+  color: #5d636b;
+
+  font-size: 10px;
+
+  font-weight: 600;
+}
+
+
+.watch-badge {
+  flex-shrink: 0;
+
+  padding: 3px 7px;
+
+  border-radius: 10px;
+
+  background: #fff2b8;
+
+  color: #6b5500;
+
+  font-size: 10px;
+
+  font-weight: 700;
+}
+
+
+
+/* ============================================================
+   CATEGORY TAGS
+   ============================================================ */
+
+.category-tags {
+  display: flex;
+
+  flex-wrap: wrap;
+
+  gap: 5px;
+
+  margin-top: 7px;
+}
+
+
+.tag {
+  display: inline-block;
+
+  padding: 3px 7px;
+
+  border-radius: 10px;
+
+  background: #eef1f4;
+
+  color: #59616a;
+
+  font-size: 10px;
+
+  line-height: 1.2;
+}
+
+
+.result-badge {
+  padding: 3px 7px;
+
+  border-radius: 10px;
+
+  background: #e7f4ea;
+
+  color: #286b38;
+
+  font-size: 10px;
+
+  font-weight: 700;
+}
+
+
+
+/* ============================================================
+   TITLE
+   ============================================================ */
+
+.announcement-card h3 {
+  margin: 9px 0 6px;
+
+  font-size: 14px;
+
+  line-height: 1.4;
+}
+
+
+.announcement-card h3 a {
+  color: #1a56db;
+
+  text-decoration: none;
+}
+
+
+.announcement-card h3 a:hover {
+  text-decoration: underline;
+}
+
+
+
+/* ============================================================
+   DESCRIPTION
+   ============================================================ */
+
+.description {
+  color: #5e646c;
+
+  font-size: 12px;
+
+  line-height: 1.45;
+
+  word-break: break-word;
+
+  max-height: 70px;
+
+  overflow: hidden;
+}
+
+
+
+/* ============================================================
+   BOTTOM
+   ============================================================ */
+
+.announcement-bottom {
+  display: flex;
+
+  align-items: center;
+
+  justify-content: space-between;
+
+  gap: 8px;
+
+  margin-top: 10px;
+
+  padding-top: 8px;
+
+  border-top: 1px solid #eef0f2;
+
+  color: #777e86;
+
+  font-size: 11px;
+}
+
+
+
+/* ============================================================
+   EMPTY
+   ============================================================ */
+
+.empty {
+  padding: 35px 15px;
 
   text-align: center;
 
-  color: #777;
+  color: #747a82;
 
+  background: #ffffff;
+
+  border: 1px solid #dfe3e8;
+
+  border-radius: 10px;
 }
 
 
 .hidden {
-
-  display: none;
-
+  display: none !important;
 }
 
 
 
-/* ==========================================
+/* ============================================================
    MOBILE
-   ========================================== */
+   ============================================================ */
 
-@media (max-width: 600px) {
+@media (
+  max-width: 700px
+) {
+
+  main {
+    padding: 9px;
+  }
 
 
   .topbar {
+    padding: 11px;
 
-    align-items:
-      flex-start;
-
+    align-items: flex-start;
   }
 
 
-  .add-row {
-
-    flex-direction:
-      column;
-
+  .topbar h1 {
+    font-size: 17px;
   }
 
 
-  .add-row button {
+  .subtitle {
+    font-size: 11px;
+  }
 
-    padding: 10px;
 
+  .refresh-btn {
+    padding: 7px 9px;
+
+    font-size: 12px;
+  }
+
+
+  .panel {
+    padding: 11px;
+
+    border-radius: 8px;
+  }
+
+
+  .panel-title h2 {
+    font-size: 14px;
+  }
+
+
+  .category-list {
+    gap: 6px;
+  }
+
+
+  .category-button {
+    min-height: 34px;
+
+    padding: 7px 9px;
+
+    font-size: 12px;
+  }
+
+
+  .category-button b {
+    font-size: 10px;
+  }
+
+
+  .current-feed {
+    align-items: flex-start;
+
+    flex-direction: column;
+  }
+
+
+  .all-btn {
+    width: 100%;
   }
 
 
   .filter-row {
-
-    flex-direction:
-      column;
-
+    flex-direction: column;
   }
 
 
   .filter-row select {
-
     width: 100%;
-
   }
 
 
   .status-bar {
+    flex-direction: column;
 
-    flex-direction:
-      column;
-
+    gap: 3px;
   }
 
+
+  .announcement-card {
+    padding: 10px;
+  }
+
+
+  .announcement-top {
+    flex-direction: column;
+
+    gap: 5px;
+  }
+
+
+  .watch-badge {
+    align-self: flex-start;
+  }
+
+
+  .announcement-card h3 {
+    font-size: 13px;
+  }
+
+
+  .description {
+    font-size: 11px;
+  }
 
 }

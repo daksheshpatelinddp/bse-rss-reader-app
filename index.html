@@ -10,7 +10,7 @@
     content="width=device-width, initial-scale=1.0"
   >
 
-  <title>BSE Results Reader</title>
+  <title>BSE Announcement Reader</title>
 
   <link
     rel="stylesheet"
@@ -22,21 +22,20 @@
 
 <body>
 
-
-  <!-- ======================================
-       TOP BAR
-       ====================================== -->
+  <!-- ======================================================
+       HEADER
+       ====================================================== -->
 
   <header class="topbar">
 
     <div>
 
       <h1>
-        BSE Results Reader
+        BSE Announcement Reader
       </h1>
 
       <div class="subtitle">
-        BSE Financial Results
+        BSE Corporate Announcements
       </div>
 
     </div>
@@ -56,12 +55,11 @@
   <main>
 
 
-    <!-- ====================================
+    <!-- ====================================================
          WATCHLIST
-         ==================================== -->
+         ==================================================== -->
 
     <section class="panel">
-
 
       <div class="panel-title">
 
@@ -78,7 +76,6 @@
 
       <div class="add-row">
 
-
         <input
           id="companyInput"
           type="text"
@@ -86,11 +83,9 @@
           autocomplete="off"
         >
 
-
         <button id="addBtn">
           + Add
         </button>
-
 
       </div>
 
@@ -100,77 +95,157 @@
         class="whitelist"
       ></div>
 
-
     </section>
 
 
 
-    <!-- ====================================
-         FILTERS
-         ==================================== -->
+    <!-- ====================================================
+         SPECIAL ALERTS
+         ==================================================== -->
 
-    <section class="panel filters">
+    <section class="panel alert-panel">
 
+      <div class="panel-title">
 
-      <div class="filter-row">
+        <h2>
+          ⭐ Alerts / Special Bundle
+        </h2>
 
-
-        <input
-          id="searchInput"
-          type="search"
-          placeholder="Search BSE results..."
-        >
-
-
-        <select id="resultTypeFilter">
-
-          <option value="all">
-            All Results
-          </option>
-
-          <option value="Audited">
-            Audited
-          </option>
-
-          <option value="Unaudited">
-            Unaudited
-          </option>
-
-        </select>
-
+        <span id="alertCount">
+          0
+        </span>
 
       </div>
 
 
+      <button
+        id="alertsBtn"
+        class="category-button special"
+      >
+        Open Alerts
+      </button>
+
     </section>
 
 
 
-    <!-- ====================================
+    <!-- ====================================================
+         FEEDS / CATEGORIES
+         ==================================================== -->
+
+    <section class="panel">
+
+      <div class="panel-title">
+
+        <h2>
+          BSE Announcement Feeds
+        </h2>
+
+        <span id="totalCount">
+          0
+        </span>
+
+      </div>
+
+
+      <div
+        id="categoryList"
+        class="category-list"
+      ></div>
+
+    </section>
+
+
+
+    <!-- ====================================================
+         CURRENT FEED
+         ==================================================== -->
+
+    <section class="panel">
+
+      <div class="current-feed">
+
+        <div>
+
+          <div
+            id="currentFeedTitle"
+            class="feed-title"
+          >
+            All Announcements
+          </div>
+
+          <div
+            id="currentFeedCount"
+            class="feed-count"
+          >
+            0 announcements
+          </div>
+
+        </div>
+
+
+        <button
+          id="allBtn"
+          class="all-btn"
+        >
+          All Announcements
+        </button>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- ====================================================
+         SEARCH / FILTER
+         ==================================================== -->
+
+    <section class="panel filters">
+
+      <div class="filter-row">
+
+        <input
+          id="searchInput"
+          type="search"
+          placeholder="Search company, scrip or announcement..."
+        >
+
+        <select id="categoryFilter">
+
+          <option value="all">
+            Current Feed: All
+          </option>
+
+        </select>
+
+      </div>
+
+    </section>
+
+
+
+    <!-- ====================================================
          STATUS
-         ==================================== -->
+         ==================================================== -->
 
     <section class="status-bar">
 
-
       <span id="status">
-        Loading...
+        Loading BSE announcements...
       </span>
 
-
       <span id="lastUpdated"></span>
-
 
     </section>
 
 
 
-    <!-- ====================================
-         RESULTS
-         ==================================== -->
+    <!-- ====================================================
+         ANNOUNCEMENTS
+         ==================================================== -->
 
     <section>
-
 
       <div
         id="results"
@@ -182,9 +257,8 @@
         id="empty"
         class="empty hidden"
       >
-        No matching results.
+        No announcements found.
       </div>
-
 
     </section>
 
@@ -193,12 +267,7 @@
 
 
 
-  <!-- ======================================
-       JAVASCRIPT
-       ====================================== -->
-
   <script src="app.js"></script>
-
 
 </body>
 
