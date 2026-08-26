@@ -3,12 +3,21 @@ const API =
 
 
 /* ============================================================
+   SETTINGS
+   ============================================================ */
+
+const PAGE_SIZE = 50;
+
+
+/* ============================================================
    STATE
    ============================================================ */
 
 let allItems = [];
 
 let currentItems = [];
+
+let displayedItems = [];
 
 let categories = [];
 
@@ -17,6 +26,10 @@ let watchlist = [];
 let alerts = [];
 
 let currentFeed = "all";
+
+let currentPage = 1;
+
+let totalPages = 1;
 
 
 /* ============================================================
@@ -55,29 +68,20 @@ const currentFeedCount =
   );
 
 const totalCount =
-  document.getElementById(
-    "totalCount"
-  );
+  document.getElementById("totalCount");
 
 const alertCount =
-  document.getElementById(
-    "alertCount"
-  );
+  document.getElementById("alertCount");
 
 const watchCount =
-  document.getElementById(
-    "watchCount"
-  );
+  document.getElementById("watchCount");
 
 const whitelist =
-  document.getElementById(
-    "whitelist"
-  );
-
+  document.getElementById("whitelist");
 
 
 /* ============================================================
-   API HELPER
+   API
    ============================================================ */
 
 async function api(
@@ -104,9 +108,21 @@ async function api(
 }
 
 
+/* ============================================================
+   STATUS
+   ============================================================ */
+
+function setStatus(
+  text
+) {
+
+  statusEl.textContent =
+    text;
+}
+
 
 /* ============================================================
-   LOAD WATCHLIST
+   WATCHLIST
    ============================================================ */
 
 async function loadWatchlist() {
@@ -132,21 +148,16 @@ async function loadWatchlist() {
   } catch (error) {
 
     console.error(
-      "Watchlist error:",
+      "Watchlist:",
       error
     );
   }
 }
 
 
-
-/* ============================================================
-   SAVE WATCHLIST
-   ============================================================ */
-
 async function saveWatchlist() {
 
-  const response =
+  const data =
     await api(
       "/watchlist",
       {
@@ -167,18 +178,16 @@ async function saveWatchlist() {
 
 
   watchlist =
-    response.watchlist ||
-    watchlist;
+    Array.isArray(
+      data.watchlist
+    )
+      ? data.watchlist
+      : watchlist;
 
 
   renderWatchlist();
 }
 
-
-
-/* ============================================================
-   ADD WATCHLIST ITEM
-   ============================================================ */
 
 async function addWatch() {
 
@@ -198,8 +207,7 @@ async function addWatch() {
 
 
   /*
-   * If it is a six-digit BSE scrip,
-   * save it as scrip.
+   * Six digits = BSE scrip.
    */
   if (
     /^\d{6}$/.test(
@@ -211,7 +219,7 @@ async function addWatch() {
       !watchlist.some(
         item =>
           String(
-            item.scrip
+            item.scrip || ""
           ) === value
       )
     ) {
@@ -224,15 +232,13 @@ async function addWatch() {
 
   } else {
 
-    /*
-     * Otherwise save as company name.
-     */
     if (
       !watchlist.some(
         item =>
           String(
             item.name || ""
-          ).toLowerCase() ===
+          )
+            .toLowerCase() ===
           value.toLowerCase()
       )
     ) {
@@ -259,21 +265,16 @@ async function addWatch() {
 
   } catch (error) {
 
-    setStatus(
-      "Could not save whitelist."
-    );
-
     console.error(
       error
+    );
+
+    setStatus(
+      "Could not save whitelist."
     );
   }
 }
 
-
-
-/* ============================================================
-   REMOVE WATCHLIST ITEM
-   ============================================================ */
 
 async function removeWatch(
   index
@@ -297,11 +298,6 @@ async function removeWatch(
   }
 }
 
-
-
-/* ============================================================
-   RENDER WATCHLIST
-   ============================================================ */
 
 function renderWatchlist() {
 
@@ -327,7 +323,7 @@ function renderWatchlist() {
 
     whitelist.innerHTML =
       `<div class="muted">
-         No companies whitelisted.
+        No companies whitelisted yet.
        </div>`;
 
     return;
@@ -360,8 +356,9 @@ function renderWatchlist() {
         </span>
 
         <button
-          data-index="${index}"
           class="remove-watch"
+          data-index="${index}"
+          title="Remove"
         >
           ×
         </button>
@@ -397,9 +394,8 @@ function renderWatchlist() {
 }
 
 
-
 /* ============================================================
-   LOAD ALL DATA
+   LOAD DATA
    ============================================================ */
 
 async function loadData() {
@@ -411,9 +407,6 @@ async function loadData() {
 
   try {
 
-    /*
-     * Get the actual announcements.
-     */
     const announcementData =
       await api(
         "/bse-announcements"
@@ -428,9 +421,6 @@ async function loadData() {
         : [];
 
 
-    /*
-     * Get category counts.
-     */
     const categoryData =
       await api(
         "/categories"
@@ -445,9 +435,6 @@ async function loadData() {
         : [];
 
 
-    /*
-     * Get alerts.
-     */
     const alertData =
       await api(
         "/alerts"
@@ -463,7 +450,7 @@ async function loadData() {
 
 
     totalCount.textContent =
-      allItems.length;
+      allItems.length.toLocaleString();
 
 
     alertCount.textContent =
@@ -473,6 +460,7 @@ async function loadData() {
     renderCategories();
 
     renderCategoryFilter();
+
 
     selectFeed(
       "all"
@@ -486,7 +474,6 @@ async function loadData() {
 
     lastUpdated.textContent =
       new Date().toLocaleTimeString();
-
 
   } catch (error) {
 
@@ -503,9 +490,8 @@ async function loadData() {
 }
 
 
-
 /* ============================================================
-   RENDER CATEGORY BUTTONS
+   CATEGORIES
    ============================================================ */
 
 function renderCategories() {
@@ -515,7 +501,7 @@ function renderCategories() {
 
 
   /*
-   * ALL ANNOUNCEMENTS button.
+   * ALL
    */
   const allButton =
     document.createElement(
@@ -527,9 +513,13 @@ function renderCategories() {
     "category-button all-category";
 
 
+  allButton.dataset.category =
+    "all";
+
+
   allButton.innerHTML = `
     <span>All Announcements</span>
-    <b>${allItems.length}</b>
+    <b>${allItems.length.toLocaleString()}</b>
   `;
 
 
@@ -548,7 +538,10 @@ function renderCategories() {
 
 
   /*
-   * Category buttons.
+   * EVERY CATEGORY
+   *
+   * These remain visible even when
+   * All Announcements is selected.
    */
   categories.forEach(
     category => {
@@ -599,16 +592,11 @@ function renderCategories() {
 }
 
 
-
-/* ============================================================
-   CATEGORY SELECT
-   ============================================================ */
-
 function renderCategoryFilter() {
 
   categoryFilter.innerHTML =
     `<option value="all">
-       Current Feed: All
+      All Categories
      </option>`;
 
 
@@ -626,7 +614,7 @@ function renderCategoryFilter() {
 
 
       option.textContent =
-        `Current Feed: ${category.name}`;
+        category.name;
 
 
       categoryFilter.appendChild(
@@ -635,7 +623,6 @@ function renderCategoryFilter() {
     }
   );
 }
-
 
 
 /* ============================================================
@@ -649,6 +636,9 @@ function selectFeed(
   currentFeed =
     feed;
 
+  currentPage =
+    1;
+
 
   if (
     feed === "all"
@@ -659,15 +649,7 @@ function selectFeed(
 
 
     currentFeedTitle.textContent =
-      "All Announcements";
-
-
-    currentFeedCount.textContent =
-      `${currentItems.length.toLocaleString()} announcements`;
-
-
-    categoryFilter.value =
-      "all";
+      "All BSE Announcements";
 
   } else {
 
@@ -703,20 +685,27 @@ function selectFeed(
 
     currentFeedTitle.textContent =
       feed;
-
-
-    currentFeedCount.textContent =
-      `${currentItems.length.toLocaleString()} announcements`;
-
-
-    categoryFilter.value =
-      feed;
   }
 
 
-  /*
-   * Highlight selected button.
-   */
+  currentFeedCount.textContent =
+    `${currentItems.length.toLocaleString()} announcements`;
+
+
+  categoryFilter.value =
+    feed === "all"
+      ? "all"
+      : feed;
+
+
+  updateCategoryHighlight();
+
+  applySearch();
+}
+
+
+function updateCategoryHighlight() {
+
   document
     .querySelectorAll(
       ".category-button"
@@ -726,31 +715,19 @@ function selectFeed(
 
         button.classList.toggle(
           "active",
-          (
-            feed ===
-            button.dataset.category
-          ) ||
-          (
-            feed === "all" &&
-            button.classList.contains(
-              "all-category"
-            )
-          )
+          button.dataset.category ===
+          currentFeed
         );
       }
     );
-
-
-  renderItems();
 }
 
 
-
 /* ============================================================
-   FILTER CURRENT FEED
+   SEARCH
    ============================================================ */
 
-function filterItems() {
+function applySearch() {
 
   const query =
     searchInput.value
@@ -758,13 +735,14 @@ function filterItems() {
       .toLowerCase();
 
 
-  let filtered =
-    currentItems;
+  if (!query) {
 
+    displayedItems =
+      [...currentItems];
 
-  if (query) {
+  } else {
 
-    filtered =
+    displayedItems =
       currentItems.filter(
         item => {
 
@@ -775,6 +753,7 @@ function filterItems() {
               item.title,
               item.description,
               item.category,
+
               ...(Array.isArray(
                 item.categories
               )
@@ -794,36 +773,129 @@ function filterItems() {
   }
 
 
-  renderItems(
-    filtered
+  currentPage =
+    1;
+
+
+  renderPage();
+}
+
+
+/* ============================================================
+   SORT
+   ============================================================ */
+
+function sortedItems(
+  items
+) {
+
+  return [...items].sort(
+    (a, b) => {
+
+      const da =
+        new Date(
+          a.pubDate ||
+          0
+        ).getTime();
+
+
+      const db =
+        new Date(
+          b.pubDate ||
+          0
+        ).getTime();
+
+
+      return db - da;
+    }
   );
 }
 
 
-
 /* ============================================================
-   RENDER ANNOUNCEMENTS
+   GROUP EXACT DUPLICATES
    ============================================================ */
 
-function renderItems(
-  suppliedItems
+function groupDuplicates(
+  items
 ) {
 
-  const items =
-    suppliedItems ||
-    currentItems;
+  const map =
+    new Map();
 
+
+  for (
+    const item of items
+  ) {
+
+    /*
+     * We deliberately use company +
+     * title + description.
+     *
+     * Different BSE announcements
+     * remain separate.
+     */
+    const key =
+      [
+        item.company || "",
+        item.title || "",
+        item.description || ""
+      ]
+        .join("|")
+        .trim()
+        .toLowerCase();
+
+
+    if (
+      !map.has(key)
+    ) {
+
+      map.set(
+        key,
+        {
+          item,
+          items: [item],
+        }
+      );
+
+    } else {
+
+      map
+        .get(key)
+        .items
+        .push(item);
+    }
+  }
+
+
+  return Array.from(
+    map.values()
+  );
+}
+
+
+/* ============================================================
+   RENDER CURRENT PAGE
+   ============================================================ */
+
+function renderPage() {
 
   results.innerHTML =
     "";
 
 
   if (
-    items.length === 0
+    displayedItems.length === 0
   ) {
 
     empty.classList.remove(
       "hidden"
+    );
+
+
+    renderPagination(
+      0,
+      0
     );
 
     return;
@@ -835,52 +907,80 @@ function renderItems(
   );
 
 
-  /*
-   * Newest first.
-   */
   const sorted =
-    [...items].sort(
-      (a, b) => {
-
-        const da =
-          new Date(
-            a.pubDate ||
-            0
-          ).getTime();
-
-
-        const db =
-          new Date(
-            b.pubDate ||
-            0
-          ).getTime();
-
-
-        return db - da;
-      }
+    sortedItems(
+      displayedItems
     );
 
 
-  sorted.forEach(
-    item => {
+  totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        sorted.length /
+        PAGE_SIZE
+      )
+    );
+
+
+  if (
+    currentPage >
+    totalPages
+  ) {
+
+    currentPage =
+      totalPages;
+  }
+
+
+  const start =
+    (
+      currentPage -
+      1
+    ) *
+    PAGE_SIZE;
+
+
+  const pageItems =
+    sorted.slice(
+      start,
+      start +
+      PAGE_SIZE
+    );
+
+
+  const groups =
+    groupDuplicates(
+      pageItems
+    );
+
+
+  groups.forEach(
+    group => {
 
       results.appendChild(
         createAnnouncementCard(
-          item
+          group.item,
+          group.items
         )
       );
     }
   );
+
+
+  renderPagination(
+    sorted.length,
+    totalPages
+  );
 }
-
-
 
 /* ============================================================
    ANNOUNCEMENT CARD
    ============================================================ */
 
 function createAnnouncementCard(
-  item
+  item,
+  groupedItems = [item]
 ) {
 
   const card =
@@ -918,6 +1018,10 @@ function createAnnouncementCard(
     );
 
 
+  const duplicateCount =
+    groupedItems.length;
+
+
   card.innerHTML = `
 
     <div class="announcement-top">
@@ -931,11 +1035,13 @@ function createAnnouncementCard(
 
         ${
           item.scrip
-            ? `<span class="scrip">
-                 ${escapeHtml(
-                   item.scrip
-                 )}
-               </span>`
+            ? `
+              <span class="scrip">
+                ${escapeHtml(
+                  item.scrip
+                )}
+              </span>
+            `
             : ""
         }
 
@@ -944,9 +1050,11 @@ function createAnnouncementCard(
 
       ${
         whitelisted
-          ? `<span class="watch-badge">
-               ⭐ Whitelisted
-             </span>`
+          ? `
+            <span class="watch-badge">
+              ⭐ Whitelisted
+            </span>
+          `
           : ""
       }
 
@@ -959,11 +1067,13 @@ function createAnnouncementCard(
         .split(" • ")
         .map(
           category =>
-            `<span class="tag">
-               ${escapeHtml(
-                 category
-               )}
-             </span>`
+            `
+            <span class="tag">
+              ${escapeHtml(
+                category
+              )}
+            </span>
+            `
         )
         .join("")}
 
@@ -974,18 +1084,20 @@ function createAnnouncementCard(
 
       ${
         item.link
-          ? `<a
-               href="${escapeAttr(
-                 item.link
-               )}"
-               target="_blank"
-               rel="noopener noreferrer"
-             >
-               ${escapeHtml(
-                 item.title ||
-                 "BSE Announcement"
-               )}
-             </a>`
+          ? `
+            <a
+              href="${escapeAttr(
+                item.link
+              )}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ${escapeHtml(
+                item.title ||
+                "BSE Announcement"
+              )}
+            </a>
+          `
           : escapeHtml(
               item.title ||
               "BSE Announcement"
@@ -997,11 +1109,13 @@ function createAnnouncementCard(
 
     ${
       item.description
-        ? `<div class="description">
-             ${escapeHtml(
-               item.description
-             )}
-           </div>`
+        ? `
+          <div class="description">
+            ${escapeHtml(
+              item.description
+            )}
+          </div>
+        `
         : ""
     }
 
@@ -1015,17 +1129,130 @@ function createAnnouncementCard(
       </span>
 
 
-      ${
-        item.isFinancialResult
-          ? `<span class="result-badge">
-               Financial Result
-             </span>`
-          : ""
-      }
+      <span class="bottom-right">
+
+        ${
+          item.isFinancialResult
+            ? `
+              <span class="result-badge">
+                Financial Result
+              </span>
+            `
+            : ""
+        }
+
+
+        ${
+          duplicateCount > 1
+            ? `
+              <button
+                class="duplicate-btn"
+              >
+                ${duplicateCount}
+                similar announcements
+              </button>
+            `
+            : ""
+        }
+
+      </span>
 
     </div>
 
+
+    ${
+      duplicateCount > 1
+        ? `
+          <div
+            class="duplicate-list hidden"
+          >
+
+            ${groupedItems
+              .map(
+                (duplicate, index) => {
+
+                  return `
+                    <div
+                      class="duplicate-item"
+                    >
+
+                      <div>
+                        ${index + 1}.
+                        ${escapeHtml(
+                          formatDate(
+                            duplicate.pubDate
+                          )
+                        )}
+                      </div>
+
+
+                      ${
+                        duplicate.link
+                          ? `
+                            <a
+                              href="${escapeAttr(
+                                duplicate.link
+                              )}"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Open announcement
+                            </a>
+                          `
+                          : ""
+                      }
+
+                    </div>
+                  `;
+                }
+              )
+              .join("")}
+
+          </div>
+        `
+        : ""
+    }
+
   `;
+
+
+  /*
+   * Expand duplicate announcements.
+   */
+  if (
+    duplicateCount > 1
+  ) {
+
+    const button =
+      card.querySelector(
+        ".duplicate-btn"
+      );
+
+
+    const list =
+      card.querySelector(
+        ".duplicate-list"
+      );
+
+
+    button.addEventListener(
+      "click",
+      () => {
+
+        list.classList.toggle(
+          "hidden"
+        );
+
+
+        button.textContent =
+          list.classList.contains(
+            "hidden"
+          )
+            ? `${duplicateCount} similar announcements`
+            : "Hide similar announcements";
+      }
+    );
+  }
 
 
   return card;
@@ -1044,6 +1271,10 @@ function isWhitelisted(
   return watchlist.some(
     watch => {
 
+      /*
+       * SCRIP IS THE PRIMARY
+       * WHITELIST METHOD.
+       */
       if (
         watch.scrip &&
         item.scrip
@@ -1052,24 +1283,34 @@ function isWhitelisted(
         return (
           String(
             watch.scrip
-          ) ===
+          ).trim() ===
           String(
             item.scrip
-          )
+          ).trim()
         );
       }
 
 
+      /*
+       * Name matching remains
+       * available as a secondary
+       * option.
+       */
       if (
         watch.name &&
         item.company
       ) {
 
         return (
-          watch.name
+          String(
+            watch.name
+          )
             .trim()
             .toLowerCase() ===
-          item.company
+
+          String(
+            item.company
+          )
             .trim()
             .toLowerCase()
         );
@@ -1084,7 +1325,7 @@ function isWhitelisted(
 
 
 /* ============================================================
-   ALERTS VIEW
+   ALERTS / SPECIAL BUNDLE
    ============================================================ */
 
 async function showAlerts() {
@@ -1098,7 +1339,11 @@ async function showAlerts() {
 
 
     alerts =
-      data.items || [];
+      Array.isArray(
+        data.items
+      )
+        ? data.items
+        : [];
 
 
     alertCount.textContent =
@@ -1110,7 +1355,7 @@ async function showAlerts() {
 
 
     currentItems =
-      alerts;
+      [...alerts];
 
 
     currentFeedTitle.textContent =
@@ -1119,6 +1364,10 @@ async function showAlerts() {
 
     currentFeedCount.textContent =
       `${alerts.length} alerts`;
+
+
+    categoryFilter.value =
+      "all";
 
 
     document
@@ -1133,15 +1382,16 @@ async function showAlerts() {
       );
 
 
-    categoryFilter.value =
-      "all";
+    currentPage =
+      1;
 
 
-    renderItems();
+    applySearch();
 
   } catch (error) {
 
     console.error(
+      "Alerts:",
       error
     );
 
@@ -1155,17 +1405,179 @@ async function showAlerts() {
 
 
 /* ============================================================
-   HELPERS
+   PAGINATION
    ============================================================ */
 
-function setStatus(
-  text
+function renderPagination(
+  total,
+  pages
 ) {
 
-  statusEl.textContent =
-    text;
+  let old =
+    document.getElementById(
+      "pagination"
+    );
+
+
+  if (!old) {
+
+    old =
+      document.createElement(
+        "div"
+      );
+
+
+    old.id =
+      "pagination";
+
+
+    old.className =
+      "pagination";
+
+
+    results.parentNode.insertBefore(
+      old,
+      results.nextSibling
+    );
+  }
+
+
+  old.innerHTML =
+    "";
+
+
+  if (
+    total === 0 ||
+    pages <= 1
+  ) {
+
+    return;
+  }
+
+
+  const previous =
+    document.createElement(
+      "button"
+    );
+
+
+  previous.textContent =
+    "‹ Previous";
+
+
+  previous.disabled =
+    currentPage <= 1;
+
+
+  previous.addEventListener(
+    "click",
+    () => {
+
+      if (
+        currentPage > 1
+      ) {
+
+        currentPage--;
+
+        renderPage();
+
+        scrollToResults();
+      }
+    }
+  );
+
+
+  old.appendChild(
+    previous
+  );
+
+
+  const info =
+    document.createElement(
+      "span"
+    );
+
+
+  info.textContent =
+    `Page ${currentPage} of ${pages}`;
+
+
+  old.appendChild(
+    info
+  );
+
+
+  const next =
+    document.createElement(
+      "button"
+    );
+
+
+  next.textContent =
+    "Next ›";
+
+
+  next.disabled =
+    currentPage >= pages;
+
+
+  next.addEventListener(
+    "click",
+    () => {
+
+      if (
+        currentPage <
+        pages
+      ) {
+
+        currentPage++;
+
+        renderPage();
+
+        scrollToResults();
+      }
+    }
+  );
+
+
+  old.appendChild(
+    next
+  );
 }
 
+
+
+/* ============================================================
+   SCROLL
+   ============================================================ */
+
+function scrollToResults() {
+
+  const element =
+    document.getElementById(
+      "results"
+    );
+
+
+  if (!element) {
+    return;
+  }
+
+
+  element.scrollIntoView({
+    behavior:
+      "smooth",
+
+    block:
+      "start",
+  });
+}
+
+
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
 
 function formatDate(
   value
@@ -1188,7 +1600,9 @@ function formatDate(
     )
   ) {
 
-    return value;
+    return String(
+      value
+    );
   }
 
 
@@ -1278,9 +1692,9 @@ document
     "click",
     async () => {
 
-      await loadData();
-
       await loadWatchlist();
+
+      await loadData();
 
     }
   );
@@ -1292,10 +1706,14 @@ document
   )
   .addEventListener(
     "click",
-    () =>
+    () => {
+
       selectFeed(
         "all"
-      )
+      );
+
+      scrollToResults();
+    }
   );
 
 
@@ -1305,14 +1723,22 @@ document
   )
   .addEventListener(
     "click",
-    showAlerts
+    () => {
+
+      showAlerts();
+
+      scrollToResults();
+    }
   );
 
 
 searchInput
   .addEventListener(
     "input",
-    filterItems
+    () => {
+
+      applySearch();
+    }
   );
 
 
@@ -1324,6 +1750,8 @@ categoryFilter
       selectFeed(
         event.target.value
       );
+
+      scrollToResults();
     }
   );
 
