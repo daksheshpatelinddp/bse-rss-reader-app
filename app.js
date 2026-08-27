@@ -95,14 +95,27 @@ async function api(
       options
     );
 
-
   if (!response.ok) {
 
+    let message =
+      `HTTP ${response.status}`;
+
+    try {
+
+      const data =
+        await response.json();
+
+      if (data.error) {
+        message =
+          data.error;
+      }
+
+    } catch (_) {}
+
     throw new Error(
-      `HTTP ${response.status}`
+      message
     );
   }
-
 
   return response.json();
 }
@@ -116,8 +129,10 @@ function setStatus(
   text
 ) {
 
-  statusEl.textContent =
-    text;
+  if (statusEl) {
+    statusEl.textContent =
+      text;
+  }
 }
 
 
@@ -134,7 +149,6 @@ async function loadWatchlist() {
         "/watchlist"
       );
 
-
     watchlist =
       Array.isArray(
         data.watchlist
@@ -142,18 +156,25 @@ async function loadWatchlist() {
         ? data.watchlist
         : [];
 
-
     renderWatchlist();
 
   } catch (error) {
 
     console.error(
-      "Watchlist:",
+      "Watchlist load:",
       error
+    );
+
+    setStatus(
+      "Could not load whitelist."
     );
   }
 }
 
+
+/* ============================================================
+   SAVE WATCHLIST TO CLOUDFLARE KV
+   ============================================================ */
 
 async function saveWatchlist() {
 
@@ -166,28 +187,37 @@ async function saveWatchlist() {
 
         headers: {
           "Content-Type":
-            "application/json",
+            "application/json"
         },
 
         body:
           JSON.stringify({
-            watchlist,
-          }),
+            watchlist:
+              watchlist
+          })
       }
     );
 
 
-  watchlist =
+  if (
     Array.isArray(
       data.watchlist
     )
-      ? data.watchlist
-      : watchlist;
+  ) {
+
+    watchlist =
+      data.watchlist;
+
+  }
 
 
   renderWatchlist();
 }
 
+
+/* ============================================================
+   ADD WATCHLIST COMPANY
+   ============================================================ */
 
 async function addWatch() {
 
@@ -196,66 +226,249 @@ async function addWatch() {
       "companyInput"
     );
 
+  if (!input) {
+    return;
+  }
+
 
   const value =
     input.value.trim();
 
 
   if (!value) {
+
+    setStatus(
+      "Enter a BSE scrip code."
+    );
+
+    input.focus();
+
     return;
   }
 
 
   /*
+   * PRIMARY METHOD:
+   *
    * Six digits = BSE scrip.
    */
+
   if (
     /^\d{6}$/.test(
       value
     )
   ) {
 
-    if (
-      !watchlist.some(
+    const alreadyExists =
+      watchlist.some(
         item =>
           String(
             item.scrip || ""
-          ) === value
-      )
+          ).trim() ===
+          value
+      );
+
+
+    if (
+      alreadyExists
     ) {
 
-      watchlist.push({
-        scrip:
-          value,
-      });
+      setStatus(
+        "This scrip is already whitelisted."
+      );
+
+      input.value =
+        "";
+
+      return;
     }
+
+
+    /*
+     * Store the scrip only.
+     * Worker will use the scrip
+     * for exact matching.
+     */
+
+    watchlist.push({
+      scrip:
+        value
+    });
 
   } else {
 
-    if (
-      !watchlist.some(
+    /*
+     * Name matching is still supported
+     * for compatibility.
+     */
+
+    const name =
+      value.toLowerCase();
+
+
+    const alreadyExists =
+      watchlist.some(
         item =>
           String(
             item.name || ""
           )
+            .trim()
             .toLowerCase() ===
-          value.toLowerCase()
-      )
+          name
+      );
+
+
+    if (
+      alreadyExists
     ) {
 
-      watchlist.push({
-        name:
-          value,
-      });
+      setStatus(
+        "This company is already whitelisted."
+      );
+
+      input.value =
+        "";
+
+      return;
     }
+
+
+    watchlist.push({
+      name:
+        value
+    });
+
   }
 
 
-  input.value =
-    "";
+  /*
+   * Keep value until save succeeds.
+   * This prevents losing the entry if
+   * the network request fails.
+   */
+
+  try {
+
+    setStatus(
+      "Saving whitelist..."
+    );
+
+    await saveWatchlist();
+
+    input.value =
+      "";
+
+    setStatus(
+      "Whitelist saved successfully."
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Whitelist save:",
+      error
+    );
+
+
+    /*
+     * Undo the locally added item
+     * if Cloudflare rejected the save.
+     */
+
+    watchlist =
+      watchlist.filter(
+        (item, index) => {
+
+          /*
+           * Remove the newest
+           * matching item only.
+           */
+
+          if (
+            /^\d{6}$/.test(
+              value
+            )
+          ) {
+
+            return !(
+              index ===
+                watchlist.length - 1 &&
+              String(
+                item.scrip || ""
+              ) === value
+            );
+
+          }
+
+
+          return !(
+            index ===
+              watchlist.length - 1 &&
+            String(
+              item.name || ""
+            )
+              .toLowerCase() ===
+              value.toLowerCase()
+          );
+
+        }
+      );
+
+
+    renderWatchlist();
+
+
+    setStatus(
+      "Could not save whitelist."
+    );
+
+    alert(
+      "Could not save whitelist.\n\n" +
+      String(
+        error?.message ||
+        error
+      )
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   REMOVE WATCHLIST COMPANY
+   ============================================================ */
+
+async function removeWatch(
+  index
+) {
+
+  if (
+    index < 0 ||
+    index >= watchlist.length
+  ) {
+    return;
+  }
+
+
+  const oldWatchlist =
+    [...watchlist];
+
+
+  watchlist.splice(
+    index,
+    1
+  );
+
+
+  renderWatchlist();
 
 
   try {
+
+    setStatus(
+      "Saving whitelist..."
+    );
 
     await saveWatchlist();
 
@@ -266,40 +479,47 @@ async function addWatch() {
   } catch (error) {
 
     console.error(
+      "Whitelist remove:",
       error
     );
+
+
+    /*
+     * Restore if saving failed.
+     */
+
+    watchlist =
+      oldWatchlist;
+
+    renderWatchlist();
 
     setStatus(
-      "Could not save whitelist."
+      "Could not update whitelist."
     );
+
+    alert(
+      "Could not update whitelist.\n\n" +
+      String(
+        error?.message ||
+        error
+      )
+    );
+
   }
+
 }
 
 
-async function removeWatch(
-  index
-) {
-
-  watchlist.splice(
-    index,
-    1
-  );
-
-
-  try {
-
-    await saveWatchlist();
-
-  } catch (error) {
-
-    console.error(
-      error
-    );
-  }
-}
-
+/* ============================================================
+   DISPLAY WHITELIST
+   ============================================================ */
 
 function renderWatchlist() {
+
+  if (!whitelist) {
+    return;
+  }
+
 
   watchlist =
     Array.isArray(
@@ -309,8 +529,12 @@ function renderWatchlist() {
       : [];
 
 
-  watchCount.textContent =
-    watchlist.length;
+  if (watchCount) {
+
+    watchCount.textContent =
+      watchlist.length;
+
+  }
 
 
   whitelist.innerHTML =
@@ -322,9 +546,11 @@ function renderWatchlist() {
   ) {
 
     whitelist.innerHTML =
-      `<div class="muted">
+      `
+      <div class="muted">
         No companies whitelisted yet.
-       </div>`;
+      </div>
+      `;
 
     return;
   }
@@ -346,34 +572,40 @@ function renderWatchlist() {
       const label =
         item.scrip
           ? `BSE ${item.scrip}`
-          : item.name;
+          : (
+              item.name ||
+              "Unknown"
+            );
 
 
-      div.innerHTML = `
-
+      div.innerHTML =
+        `
         <span>
-          ${escapeHtml(label)}
+          ${escapeHtml(
+            label
+          )}
         </span>
 
         <button
+          type="button"
           class="remove-watch"
           data-index="${index}"
           title="Remove"
         >
           ×
         </button>
-
-      `;
+        `;
 
 
       whitelist.appendChild(
         div
       );
+
     }
   );
 
 
-  document
+  whitelist
     .querySelectorAll(
       ".remove-watch"
     )
@@ -382,20 +614,29 @@ function renderWatchlist() {
 
         button.addEventListener(
           "click",
-          () =>
+          function(event) {
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
             removeWatch(
               Number(
                 button.dataset.index
               )
-            )
+            );
+
+          }
         );
+
       }
     );
+
 }
 
 
 /* ============================================================
-   LOAD DATA
+   LOAD BSE DATA
    ============================================================ */
 
 async function loadData() {
@@ -449,12 +690,21 @@ async function loadData() {
         : [];
 
 
-    totalCount.textContent =
-      allItems.length.toLocaleString();
+    if (totalCount) {
+
+      totalCount.textContent =
+        allItems.length
+          .toLocaleString();
+
+    }
 
 
-    alertCount.textContent =
-      alerts.length;
+    if (alertCount) {
+
+      alertCount.textContent =
+        alerts.length;
+
+    }
 
 
     renderCategories();
@@ -472,8 +722,13 @@ async function loadData() {
     );
 
 
-    lastUpdated.textContent =
-      new Date().toLocaleTimeString();
+    if (lastUpdated) {
+
+      lastUpdated.textContent =
+        new Date()
+          .toLocaleTimeString();
+
+    }
 
   } catch (error) {
 
@@ -482,11 +737,12 @@ async function loadData() {
       error
     );
 
-
     setStatus(
       "Error loading BSE announcements."
     );
+
   }
+
 }
 
 
@@ -496,17 +752,27 @@ async function loadData() {
 
 function renderCategories() {
 
+  if (!categoryList) {
+    return;
+  }
+
+
   categoryList.innerHTML =
     "";
 
 
   /*
-   * ALL
+   * ALL ANNOUNCEMENTS
    */
+
   const allButton =
     document.createElement(
       "button"
     );
+
+
+  allButton.type =
+    "button";
 
 
   allButton.className =
@@ -517,18 +783,29 @@ function renderCategories() {
     "all";
 
 
-  allButton.innerHTML = `
-    <span>All Announcements</span>
-    <b>${allItems.length.toLocaleString()}</b>
-  `;
+  allButton.innerHTML =
+    `
+    <span>
+      All Announcements
+    </span>
+
+    <b>
+      ${allItems.length.toLocaleString()}
+    </b>
+    `;
 
 
   allButton.addEventListener(
     "click",
-    () =>
+    () => {
+
       selectFeed(
         "all"
-      )
+      );
+
+      scrollToResults();
+
+    }
   );
 
 
@@ -539,10 +816,8 @@ function renderCategories() {
 
   /*
    * EVERY CATEGORY
-   *
-   * These remain visible even when
-   * All Announcements is selected.
    */
+
   categories.forEach(
     category => {
 
@@ -550,6 +825,10 @@ function renderCategories() {
         document.createElement(
           "button"
         );
+
+
+      button.type =
+        "button";
 
 
       button.className =
@@ -560,7 +839,8 @@ function renderCategories() {
         category.name;
 
 
-      button.innerHTML = `
+      button.innerHTML =
+        `
         <span>
           ${escapeHtml(
             category.name
@@ -572,32 +852,50 @@ function renderCategories() {
             category.count
           ).toLocaleString()}
         </b>
-      `;
+        `;
 
 
       button.addEventListener(
         "click",
-        () =>
+        () => {
+
           selectFeed(
             category.name
-          )
+          );
+
+          scrollToResults();
+
+        }
       );
 
 
       categoryList.appendChild(
         button
       );
+
     }
   );
+
 }
 
 
+/* ============================================================
+   CATEGORY FILTER
+   ============================================================ */
+
 function renderCategoryFilter() {
 
+  if (!categoryFilter) {
+    return;
+  }
+
+
   categoryFilter.innerHTML =
-    `<option value="all">
+    `
+    <option value="all">
       All Categories
-     </option>`;
+    </option>
+    `;
 
 
   categories.forEach(
@@ -620,8 +918,10 @@ function renderCategoryFilter() {
       categoryFilter.appendChild(
         option
       );
+
     }
   );
+
 }
 
 
@@ -636,6 +936,7 @@ function selectFeed(
   currentFeed =
     feed;
 
+
   currentPage =
     1;
 
@@ -648,8 +949,12 @@ function selectFeed(
       [...allItems];
 
 
-    currentFeedTitle.textContent =
-      "All BSE Announcements";
+    if (currentFeedTitle) {
+
+      currentFeedTitle.textContent =
+        "All BSE Announcements";
+
+    }
 
   } else {
 
@@ -663,6 +968,7 @@ function selectFeed(
           ) {
 
             return true;
+
           }
 
 
@@ -675,34 +981,54 @@ function selectFeed(
             return item.categories.includes(
               feed
             );
+
           }
 
 
           return false;
+
         }
       );
 
 
-    currentFeedTitle.textContent =
-      feed;
+    if (currentFeedTitle) {
+
+      currentFeedTitle.textContent =
+        feed;
+
+    }
+
   }
 
 
-  currentFeedCount.textContent =
-    `${currentItems.length.toLocaleString()} announcements`;
+  if (currentFeedCount) {
+
+    currentFeedCount.textContent =
+      `${currentItems.length.toLocaleString()} announcements`;
+
+  }
 
 
-  categoryFilter.value =
-    feed === "all"
-      ? "all"
-      : feed;
+  if (categoryFilter) {
+
+    categoryFilter.value =
+      feed === "all"
+        ? "all"
+        : feed;
+
+  }
 
 
   updateCategoryHighlight();
 
   applySearch();
+
 }
 
+
+/* ============================================================
+   CATEGORY HIGHLIGHT
+   ============================================================ */
 
 function updateCategoryHighlight() {
 
@@ -718,8 +1044,10 @@ function updateCategoryHighlight() {
           button.dataset.category ===
           currentFeed
         );
+
       }
     );
+
 }
 
 
@@ -730,9 +1058,11 @@ function updateCategoryHighlight() {
 function applySearch() {
 
   const query =
-    searchInput.value
-      .trim()
-      .toLowerCase();
+    searchInput
+      ? searchInput.value
+          .trim()
+          .toLowerCase()
+      : "";
 
 
   if (!query) {
@@ -759,6 +1089,7 @@ function applySearch() {
               )
                 ? item.categories
                 : [])
+
             ]
               .filter(Boolean)
               .join(" ")
@@ -768,8 +1099,10 @@ function applySearch() {
           return text.includes(
             query
           );
+
         }
       );
+
   }
 
 
@@ -778,6 +1111,7 @@ function applySearch() {
 
 
   renderPage();
+
 }
 
 
@@ -807,8 +1141,10 @@ function sortedItems(
 
 
       return db - da;
+
     }
   );
+
 }
 
 
@@ -828,13 +1164,6 @@ function groupDuplicates(
     const item of items
   ) {
 
-    /*
-     * We deliberately use company +
-     * title + description.
-     *
-     * Different BSE announcements
-     * remain separate.
-     */
     const key =
       [
         item.company || "",
@@ -854,7 +1183,7 @@ function groupDuplicates(
         key,
         {
           item,
-          items: [item],
+          items: [item]
         }
       );
 
@@ -864,13 +1193,16 @@ function groupDuplicates(
         .get(key)
         .items
         .push(item);
+
     }
+
   }
 
 
   return Array.from(
     map.values()
   );
+
 }
 
 
@@ -880,17 +1212,27 @@ function groupDuplicates(
 
 function renderPage() {
 
+  if (!results) {
+    return;
+  }
+
+
   results.innerHTML =
     "";
 
 
   if (
-    displayedItems.length === 0
+    displayedItems.length ===
+    0
   ) {
 
-    empty.classList.remove(
-      "hidden"
-    );
+    if (empty) {
+
+      empty.classList.remove(
+        "hidden"
+      );
+
+    }
 
 
     renderPagination(
@@ -899,12 +1241,17 @@ function renderPage() {
     );
 
     return;
+
   }
 
 
-  empty.classList.add(
-    "hidden"
-  );
+  if (empty) {
+
+    empty.classList.add(
+      "hidden"
+    );
+
+  }
 
 
   const sorted =
@@ -930,6 +1277,7 @@ function renderPage() {
 
     currentPage =
       totalPages;
+
   }
 
 
@@ -964,6 +1312,7 @@ function renderPage() {
           group.items
         )
       );
+
     }
   );
 
@@ -972,7 +1321,9 @@ function renderPage() {
     sorted.length,
     totalPages
   );
+
 }
+
 
 /* ============================================================
    ANNOUNCEMENT CARD
@@ -1022,8 +1373,8 @@ function createAnnouncementCard(
     groupedItems.length;
 
 
-  card.innerHTML = `
-
+  card.innerHTML =
+    `
     <div class="announcement-top">
 
       <div class="company">
@@ -1146,6 +1497,7 @@ function createAnnouncementCard(
           duplicateCount > 1
             ? `
               <button
+                type="button"
                 class="duplicate-btn"
               >
                 ${duplicateCount}
@@ -1204,6 +1556,7 @@ function createAnnouncementCard(
 
                     </div>
                   `;
+
                 }
               )
               .join("")}
@@ -1213,12 +1566,9 @@ function createAnnouncementCard(
         : ""
     }
 
-  `;
+    `;
 
 
-  /*
-   * Expand duplicate announcements.
-   */
   if (
     duplicateCount > 1
   ) {
@@ -1235,29 +1585,40 @@ function createAnnouncementCard(
       );
 
 
-    button.addEventListener(
-      "click",
-      () => {
+    if (
+      button &&
+      list
+    ) {
 
-        list.classList.toggle(
-          "hidden"
-        );
+      button.addEventListener(
+        "click",
+        function(event) {
 
+          event.preventDefault();
 
-        button.textContent =
-          list.classList.contains(
+          list.classList.toggle(
             "hidden"
-          )
-            ? `${duplicateCount} similar announcements`
-            : "Hide similar announcements";
-      }
-    );
+          );
+
+
+          button.textContent =
+            list.classList.contains(
+              "hidden"
+            )
+              ? `${duplicateCount} similar announcements`
+              : "Hide similar announcements";
+
+        }
+      );
+
+    }
+
   }
 
 
   return card;
-}
 
+}
 
 
 /* ============================================================
@@ -1272,9 +1633,9 @@ function isWhitelisted(
     watch => {
 
       /*
-       * SCRIP IS THE PRIMARY
-       * WHITELIST METHOD.
+       * SCRIP = PRIMARY MATCH
        */
+
       if (
         watch.scrip &&
         item.scrip
@@ -1288,14 +1649,14 @@ function isWhitelisted(
             item.scrip
           ).trim()
         );
+
       }
 
 
       /*
-       * Name matching remains
-       * available as a secondary
-       * option.
+       * NAME = SECONDARY MATCH
        */
+
       if (
         watch.name &&
         item.company
@@ -1314,14 +1675,16 @@ function isWhitelisted(
             .trim()
             .toLowerCase()
         );
+
       }
 
 
       return false;
+
     }
   );
-}
 
+}
 
 
 /* ============================================================
@@ -1346,8 +1709,12 @@ async function showAlerts() {
         : [];
 
 
-    alertCount.textContent =
-      alerts.length;
+    if (alertCount) {
+
+      alertCount.textContent =
+        alerts.length;
+
+    }
 
 
     currentFeed =
@@ -1358,16 +1725,28 @@ async function showAlerts() {
       [...alerts];
 
 
-    currentFeedTitle.textContent =
-      "⭐ Alerts / Special Bundle";
+    if (currentFeedTitle) {
+
+      currentFeedTitle.textContent =
+        "⭐ Alerts / Special Bundle";
+
+    }
 
 
-    currentFeedCount.textContent =
-      `${alerts.length} alerts`;
+    if (currentFeedCount) {
+
+      currentFeedCount.textContent =
+        `${alerts.length} alerts`;
+
+    }
 
 
-    categoryFilter.value =
-      "all";
+    if (categoryFilter) {
+
+      categoryFilter.value =
+        "all";
+
+    }
 
 
     document
@@ -1399,9 +1778,10 @@ async function showAlerts() {
     setStatus(
       "Could not load alerts."
     );
-  }
-}
 
+  }
+
+}
 
 
 /* ============================================================
@@ -1435,10 +1815,18 @@ function renderPagination(
       "pagination";
 
 
-    results.parentNode.insertBefore(
-      old,
-      results.nextSibling
-    );
+    if (
+      results &&
+      results.parentNode
+    ) {
+
+      results.parentNode.insertBefore(
+        old,
+        results.nextSibling
+      );
+
+    }
+
   }
 
 
@@ -1452,6 +1840,7 @@ function renderPagination(
   ) {
 
     return;
+
   }
 
 
@@ -1459,6 +1848,10 @@ function renderPagination(
     document.createElement(
       "button"
     );
+
+
+  previous.type =
+    "button";
 
 
   previous.textContent =
@@ -1482,7 +1875,9 @@ function renderPagination(
         renderPage();
 
         scrollToResults();
+
       }
+
     }
   );
 
@@ -1513,6 +1908,10 @@ function renderPagination(
     );
 
 
+  next.type =
+    "button";
+
+
   next.textContent =
     "Next ›";
 
@@ -1535,7 +1934,9 @@ function renderPagination(
         renderPage();
 
         scrollToResults();
+
       }
+
     }
   );
 
@@ -1543,8 +1944,8 @@ function renderPagination(
   old.appendChild(
     next
   );
-}
 
+}
 
 
 /* ============================================================
@@ -1569,10 +1970,10 @@ function scrollToResults() {
       "smooth",
 
     block:
-      "start",
+      "start"
   });
-}
 
+}
 
 
 /* ============================================================
@@ -1603,10 +2004,12 @@ function formatDate(
     return String(
       value
     );
+
   }
 
 
   return date.toLocaleString();
+
 }
 
 
@@ -1637,6 +2040,7 @@ function escapeHtml(
       /'/g,
       "&#039;"
     );
+
 }
 
 
@@ -1647,50 +2051,86 @@ function escapeAttr(
   return escapeHtml(
     value
   );
-}
 
+}
 
 
 /* ============================================================
    EVENTS
    ============================================================ */
 
-document
-  .getElementById(
+const addButton =
+  document.getElementById(
     "addBtn"
-  )
-  .addEventListener(
-    "click",
-    addWatch
   );
 
 
-document
-  .getElementById(
+if (addButton) {
+
+  addButton.type =
+    "button";
+
+
+  addButton.addEventListener(
+    "click",
+    function(event) {
+
+      event.preventDefault();
+
+      event.stopPropagation();
+
+      addWatch();
+
+    }
+  );
+
+}
+
+
+const companyInput =
+  document.getElementById(
     "companyInput"
-  )
-  .addEventListener(
+  );
+
+
+if (companyInput) {
+
+  companyInput.addEventListener(
     "keydown",
-    event => {
+    function(event) {
 
       if (
         event.key ===
         "Enter"
       ) {
 
+        event.preventDefault();
+
+        event.stopPropagation();
+
         addWatch();
+
       }
+
     }
   );
 
+}
 
-document
-  .getElementById(
+
+const refreshBtn =
+  document.getElementById(
     "refreshBtn"
-  )
-  .addEventListener(
+  );
+
+
+if (refreshBtn) {
+
+  refreshBtn.addEventListener(
     "click",
-    async () => {
+    async function(event) {
+
+      event.preventDefault();
 
       await loadWatchlist();
 
@@ -1699,62 +2139,89 @@ document
     }
   );
 
+}
 
-document
-  .getElementById(
+
+const allBtn =
+  document.getElementById(
     "allBtn"
-  )
-  .addEventListener(
+  );
+
+
+if (allBtn) {
+
+  allBtn.addEventListener(
     "click",
-    () => {
+    function(event) {
+
+      event.preventDefault();
 
       selectFeed(
         "all"
       );
 
       scrollToResults();
+
     }
   );
 
+}
 
-document
-  .getElementById(
+
+const alertsBtn =
+  document.getElementById(
     "alertsBtn"
-  )
-  .addEventListener(
+  );
+
+
+if (alertsBtn) {
+
+  alertsBtn.addEventListener(
     "click",
-    () => {
+    function(event) {
+
+      event.preventDefault();
 
       showAlerts();
 
       scrollToResults();
+
     }
   );
 
+}
 
-searchInput
-  .addEventListener(
+
+if (searchInput) {
+
+  searchInput.addEventListener(
     "input",
-    () => {
+    function() {
 
       applySearch();
+
     }
   );
 
+}
 
-categoryFilter
-  .addEventListener(
+
+if (categoryFilter) {
+
+  categoryFilter.addEventListener(
     "change",
-    event => {
+    function(event) {
 
       selectFeed(
         event.target.value
       );
 
       scrollToResults();
+
     }
   );
 
+}
 
 
 /* ============================================================
