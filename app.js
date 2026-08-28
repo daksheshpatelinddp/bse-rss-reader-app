@@ -1,7 +1,5 @@
-
-
 const API =
-  "https://bse-rss-reader-app.daksheshpatelin.workers.dev";
+  "https://bse-rss-reader.daksheshpatelin.workers.dev";
 
 
 /* ============================================================
