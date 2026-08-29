@@ -1,10 +1,10 @@
 /**
  * BSE Announcement Reader - Front-end JavaScript (app.js)
- * Uses window.location.origin with clean path handling.
+ * Routes API requests directly to the backend worker with KV binding.
  */
 
-// Dynamically target current host origin
-const API_BASE = window.location.origin.replace(/\/$/, "");
+// Explicitly target the backend worker URL holding the BSE_DATA KV namespace
+const API_BASE = "https://bse-rss-reader.daksheshpatelin.workers.dev";
 
 let watchlist = [];
 let feeds = [];
@@ -47,7 +47,7 @@ async function handleAddWatchlist(inputEl) {
   const rawValue = inputEl.value.trim();
   if (!rawValue) return;
 
-  // Split comma, newline, or tab separated values into array
+  // Split comma, newline, or tab separated values into individual items
   const parsedItems = rawValue
     .split(/[\n,\r\t]+/)
     .map((item) => item.trim())
