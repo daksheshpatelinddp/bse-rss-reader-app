@@ -1,10 +1,10 @@
 /**
  * BSE Announcement Reader - Front-end JavaScript (app.js)
- * Parses comma-separated bulk additions into distinct tags, renders feeds,
- * and syncs cleanly with the Cloudflare Worker API.
+ * Uses window.location.origin with clean path handling.
  */
 
-const API_BASE = window.location.origin;
+// Dynamically target current host origin
+const API_BASE = window.location.origin.replace(/\/$/, "");
 
 let watchlist = [];
 let feeds = [];
@@ -47,7 +47,7 @@ async function handleAddWatchlist(inputEl) {
   const rawValue = inputEl.value.trim();
   if (!rawValue) return;
 
-  // Split by comma, space, newline, or tab to extract individual items
+  // Split comma, newline, or tab separated values into array
   const parsedItems = rawValue
     .split(/[\n,\r\t]+/)
     .map((item) => item.trim())
@@ -55,13 +55,9 @@ async function handleAddWatchlist(inputEl) {
 
   if (parsedItems.length === 0) return;
 
-  // Merge with existing state and deduplicate
   const updatedWatchlist = Array.from(new Set([...watchlist, ...parsedItems]));
-
-  // Clear input box
   inputEl.value = "";
 
-  // Update DOM and send to Cloudflare Worker
   watchlist = updatedWatchlist;
   renderWatchlist();
   await saveWatchlistToBackend(watchlist);
@@ -147,7 +143,7 @@ async function loadAlerts() {
 
 function renderWatchlist() {
   const container = document.getElementById("watchlistContainer") || document.querySelector(".watchlist-tags") || document.querySelector(".whitelisted-chips");
-  const countBadge = document.getElementById("watchlistCount");
+  const countBadge = document.getElementById("watchlistCount") || document.querySelector(".whitelisted-count");
 
   if (countBadge) countBadge.textContent = watchlist.length;
   if (!container) return;
