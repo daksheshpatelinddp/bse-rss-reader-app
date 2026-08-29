@@ -214,11 +214,12 @@ function renderWatchlist() {
     const div = document.createElement("div");
     div.className = "watch-item";
 
+    // CLEAN LABEL FORMATTING (Removed generic "BSE" prefix)
     let label = "";
     if (item.scrip && item.name) {
-      label = `BSE ${item.scrip} (${item.name})`;
+      label = `${item.name} (${item.scrip})`;
     } else if (item.scrip) {
-      label = `BSE ${item.scrip}`;
+      label = `${item.scrip}`;
     } else {
       label = item.name || "Unknown";
     }
@@ -491,7 +492,9 @@ function isWhitelisted(item) {
       if (String(watch.scrip).trim() === String(item.scrip).trim()) return true;
     }
     if (watch.name && item.company) {
-      if (String(watch.name).trim().toLowerCase() === String(item.company).trim().toLowerCase()) return true;
+      const watchName = String(watch.name).trim().toLowerCase();
+      const companyName = String(item.company).trim().toLowerCase();
+      if (watchName.length >= 3 && companyName.includes(watchName)) return true;
     }
     return false;
   });
