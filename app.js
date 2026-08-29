@@ -1,18 +1,15 @@
 /* ============================================================
-   BSE ANNOUNCEMENT READER - APP.JS (FIXED)
+   BSE ANNOUNCEMENT READER - APP.JS
    ============================================================ */
 
-// Global State
 let watchlist = [];
 let announcements = [];
 let activeCategory = "all";
 
-// Configuration & Endpoints
 const API_BASE = "https://bse-rss-reader-app.daksheshpatelin.workers.dev";
 const WATCHLIST_ENDPOINT = `${API_BASE}/watchlist`;
 const RSS_ENDPOINT = `${API_BASE}/rss`;
 
-// DOM Elements
 const watchlistInput = document.getElementById("watchlistInput");
 const addBtn = document.getElementById("addBtn");
 const clearAllBtn = document.getElementById("clearAllBtn");
@@ -23,10 +20,6 @@ const watchlistCount = document.getElementById("watchlistCount");
 const refreshBtn = document.getElementById("refreshBtn");
 const feedContainer = document.getElementById("feedContainer");
 const categoryButtons = document.querySelectorAll(".category-btn");
-
-/* ============================================================
-   INITIALIZATION & EVENT LISTENERS
-   ============================================================ */
 
 document.addEventListener("DOMContentLoaded", () => {
   fetchWatchlist();
@@ -50,7 +43,6 @@ document.addEventListener("DOMContentLoaded", () => {
       e.preventDefault();
       fileInput.click();
     });
-
     fileInput.addEventListener("change", handleFileUpload);
   }
 
@@ -64,20 +56,13 @@ document.addEventListener("DOMContentLoaded", () => {
   });
 });
 
-/* ============================================================
-   ROBUST PARSING & FLEXIBLE MATCHING
-   ============================================================ */
-
 function parseCompanyInput(rawInput) {
-  if (!rawInput) return null;
-  // Clean whitespace and quotes
-  let text = String(rawInput).replace(/["']/g, "").trim();
+  const text = rawInput.trim();
   if (!text) return null;
 
   let scrip = "";
   let name = "";
 
-  // Extract 6-digit scrip code if present
   const scripMatch = text.match(/\b(\d{6})\b/);
   if (scripMatch) {
     scrip = scripMatch[1];
@@ -90,54 +75,32 @@ function parseCompanyInput(rawInput) {
     name = text.replace(/\bbse\b/gi, "").trim();
   }
 
-  return {
-    scrip: scrip,
-    name: name,
-    raw: text
-  };
+  return { scrip, name, raw: text };
 }
 
 function isWhitelisted(item) {
-  // IF NO WHITELISTED COMPANIES, SHOW ALL 1900+ ANNOUNCEMENTS
-  if (!watchlist || watchlist.length === 0) return true;
+  if (!watchlist || watchlist.length === 0) return true; // Show all if watchlist is empty
 
-  // Handle all common RSS property variations safely
-  const companyText = String(item.company || item.companyName || item.NEWSSUB || "").toLowerCase();
-  const scripText = String(item.scrip || item.scripCode || item.SCRIP_CD || "").toLowerCase();
-  const titleText = String(item.title || item.HEADLINE || "").toLowerCase();
-  const descText = String(item.description || item.MORE || "").toLowerCase();
-
+  const companyText = String(item.company || "").toLowerCase();
+  const scripText = String(item.scrip || "").toLowerCase();
+  const titleText = String(item.title || "").toLowerCase();
+  const descText = String(item.description || "").toLowerCase();
   const fullText = `${companyText} ${scripText} ${titleText} ${descText}`;
 
   return watchlist.some((watch) => {
-    // 1. Check Scrip Code match
-    if (watch.scrip && (scripText.includes(watch.scrip.toLowerCase()) || fullText.includes(watch.scrip.toLowerCase()))) {
+    if (watch.scrip && (scripText.includes(watch.scrip) || fullText.includes(watch.scrip))) {
       return true;
     }
-
-    // 2. Check Name / Alias match
-    if (watch.name && watch.name.length > 0) {
-      const cleanName = watch.name.toLowerCase();
-      if (fullText.includes(cleanName)) {
-        return true;
-      }
+    if (watch.name && watch.name.trim().length > 0) {
+      if (fullText.includes(watch.name.trim().toLowerCase())) return true;
     }
-
-    // 3. Raw Fallback Check (handles RIL, BSE 500325, etc.)
-    if (watch.raw && watch.raw.length > 0) {
+    if (watch.raw && watch.raw.trim().length > 0) {
       const cleanRaw = watch.raw.replace(/\bbse\b/gi, "").replace(/[()]/g, "").trim().toLowerCase();
-      if (cleanRaw && fullText.includes(cleanRaw)) {
-        return true;
-      }
+      if (cleanRaw && fullText.includes(cleanRaw)) return true;
     }
-
     return false;
   });
 }
-
-/* ============================================================
-   WATCHLIST API & STATE PERSISTENCE
-   ============================================================ */
 
 async function fetchWatchlist() {
   try {
@@ -163,12 +126,11 @@ async function saveWatchlist() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ watchlist })
     });
-
     if (!res.ok) {
-      console.error("Server refused watchlist update:", res.statusText);
+      console.error("Backend failed to save watchlist");
     }
   } catch (err) {
-    console.error("Failed to save watchlist to backend worker:", err);
+    console.error("Network error while saving watchlist:", err);
   }
 }
 
@@ -184,13 +146,9 @@ function handleAddInput() {
       const exists = watchlist.some(
         (w) =>
           (parsed.scrip && w.scrip === parsed.scrip) ||
-          (parsed.name && w.name.toLowerCase() === parsed.name.toLowerCase()) ||
-          (parsed.raw && w.raw && w.raw.toLowerCase() === parsed.raw.toLowerCase())
+          (parsed.name && w.name.toLowerCase() === parsed.name.toLowerCase())
       );
-
-      if (!exists) {
-        watchlist.push(parsed);
-      }
+      if (!exists) watchlist.push(parsed);
     }
   });
 
@@ -217,60 +175,40 @@ function handleFileUpload(e) {
 
   const reader = new FileReader();
   reader.onload = function (evt) {
-    const content = evt.target.result;
-    // Split by newlines or commas
-    const lines = content.split(/[\r\n,]+/);
-
+    const lines = evt.target.result.split(/[\r\n,]+/);
     lines.forEach((line) => {
       const parsed = parseCompanyInput(line);
       if (parsed) {
         const exists = watchlist.some(
           (w) =>
             (parsed.scrip && w.scrip === parsed.scrip) ||
-            (parsed.name && w.name.toLowerCase() === parsed.name.toLowerCase()) ||
-            (parsed.raw && w.raw && w.raw.toLowerCase() === parsed.raw.toLowerCase())
+            (parsed.name && w.name.toLowerCase() === parsed.name.toLowerCase())
         );
-        if (!exists) {
-          watchlist.push(parsed);
-        }
+        if (!exists) watchlist.push(parsed);
       }
     });
-
     fileInput.value = "";
     saveWatchlist();
   };
-
   reader.readAsText(file);
 }
-
-/* ============================================================
-   UI RENDERING FUNCTIONS
-   ============================================================ */
 
 function renderWatchlist() {
   if (watchlistCount) watchlistCount.textContent = watchlist.length;
   if (!watchlistTags) return;
 
   if (watchlist.length === 0) {
-    watchlistTags.innerHTML = `<span class="empty-msg">No companies whitelisted yet. (Showing all announcements)</span>`;
+    watchlistTags.innerHTML = `<span class="empty-msg">No companies whitelisted yet. Showing all feed items.</span>`;
     return;
   }
 
   watchlistTags.innerHTML = watchlist
     .map((item, index) => {
-      let displayName = "";
-      if (item.scrip && item.name) {
-        displayName = `${item.scrip} (${item.name})`;
-      } else if (item.scrip) {
-        displayName = item.scrip;
-      } else {
-        displayName = item.name || item.raw;
-      }
-
+      let displayName = item.scrip && item.name ? `${item.scrip} (${item.name})` : item.scrip || item.name || item.raw;
       return `
         <span class="tag">
           ${displayName}
-          <button onclick="removeWatchlistItem(${index})" title="Remove">&times;</button>
+          <button onclick="removeWatchlistItem(${index})">&times;</button>
         </span>
       `;
     })
@@ -285,14 +223,13 @@ async function fetchAnnouncements() {
     const res = await fetch(RSS_ENDPOINT);
     if (res.ok) {
       const data = await res.json();
-      announcements = Array.isArray(data.items) ? data.items : (Array.isArray(data) ? data : []);
+      announcements = Array.isArray(data.items) ? data.items : [];
       renderAnnouncements();
     } else {
-      feedContainer.innerHTML = `<div class="error">Failed to load feed data.</div>`;
+      feedContainer.innerHTML = `<div class="error">Failed to load RSS feed.</div>`;
     }
   } catch (err) {
-    console.error("Error fetching announcements:", err);
-    feedContainer.innerHTML = `<div class="error">Unable to connect to announcement service.</div>`;
+    feedContainer.innerHTML = `<div class="error">Unable to connect to service.</div>`;
   }
 }
 
@@ -302,48 +239,38 @@ function renderAnnouncements() {
   let filtered = announcements.filter((item) => isWhitelisted(item));
 
   if (activeCategory !== "all") {
-    filtered = filtered.filter((item) => {
-      const cat = String(item.category || item.CATEGORYNAME || "").toLowerCase();
-      return cat.includes(activeCategory.toLowerCase());
-    });
+    filtered = filtered.filter((item) =>
+      String(item.category || "").toLowerCase().includes(activeCategory.toLowerCase())
+    );
   }
 
   if (filtered.length === 0) {
     feedContainer.innerHTML = `
       <div class="empty-feed">
-        <p>No matching announcements found for your current whitelist filter.</p>
+        <p>No announcements matching your whitelisted companies in this category.</p>
+        <p><em>Total raw announcements loaded: ${announcements.length}</em></p>
       </div>
     `;
     return;
   }
 
   feedContainer.innerHTML = filtered
-    .map((item) => {
-      const title = item.title || item.HEADLINE || "No Title";
-      const company = item.company || item.companyName || item.NEWSSUB || "BSE Listed Company";
-      const scrip = item.scrip || item.scripCode || item.SCRIP_CD ? `(${item.scrip || item.scripCode || item.SCRIP_CD})` : "";
-      const date = item.pubDate || item.NEWS_DT ? new Date(item.pubDate || item.NEWS_DT).toLocaleString() : "";
-      const link = item.link || item.ATTACHMENTNAME || "#";
-      const category = item.category || item.CATEGORYNAME || "General";
-      const description = item.description || item.MORE || "";
-
-      return `
-        <div class="announcement-card">
-          <div class="card-header">
-            <div>
-              <span class="company-name">${company}</span>
-              <span class="scrip-code">${scrip}</span>
-            </div>
-            <span class="badge">${category}</span>
+    .map((item) => `
+      <div class="announcement-card">
+        <div class="card-header">
+          <div>
+            <span class="company-name">${item.company || "BSE Company"}</span>
+            <span class="scrip-code">${item.scrip ? `(${item.scrip})` : ""}</span>
           </div>
-          <h3 class="card-title">${title}</h3>
-          <p class="card-desc">${description}</p>
-          <div class="card-footer">
-            <span class="date">${date}</span>
-            <a href="${link}" target="_blank" rel="noopener" class="pdf-link">View Attachment &rarr;</a>
-          </div>
+          <span class="badge">${item.category || "General"}</span>
         </div>
-      `;
-    })
+        <h3 class="card-title">${item.title || "No Title"}</h3>
+        <p class="card-desc">${item.description || ""}</p>
+        <div class="card-footer">
+          <span class="date">${item.pubDate ? new Date(item.pubDate).toLocaleString() : ""}</span>
+          <a href="${item.link || "#"}" target="_blank" rel="noopener" class="pdf-link">View Attachment &rarr;</a>
+        </div>
+      </div>
+    `)
     .join("");
 }
