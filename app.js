@@ -1,10 +1,9 @@
 /**
  * BSE Announcement Reader - Front-end JavaScript (app.js)
- * Fully supports bulk comma-separated entries, individual tag creation, 
- * rendering feeds/alerts, and sync with Cloudflare Worker API.
+ * Parses comma-separated bulk additions into distinct tags, renders feeds,
+ * and syncs cleanly with the Cloudflare Worker API.
  */
 
-// Replace this with your actual Cloudflare Worker URL if different
 const API_BASE = window.location.origin;
 
 let watchlist = [];
@@ -21,7 +20,7 @@ async function initApp() {
 }
 
 function setupEventListeners() {
-  const addBtn = document.getElementById("addBtn") || document.querySelector("button.add-btn");
+  const addBtn = document.getElementById("addBtn") || document.querySelector("button.add-btn") || document.querySelector(".add-btn");
   const inputEl = document.getElementById("whitelistInput") || document.querySelector("input[type='text']");
   const refreshBtn = document.getElementById("refreshBtn");
 
@@ -48,7 +47,7 @@ async function handleAddWatchlist(inputEl) {
   const rawValue = inputEl.value.trim();
   if (!rawValue) return;
 
-  // Split by comma, newlines, or tabs to process bulk entries
+  // Split by comma, space, newline, or tab to extract individual items
   const parsedItems = rawValue
     .split(/[\n,\r\t]+/)
     .map((item) => item.trim())
@@ -56,13 +55,13 @@ async function handleAddWatchlist(inputEl) {
 
   if (parsedItems.length === 0) return;
 
-  // Merge with local state and deduplicate
+  // Merge with existing state and deduplicate
   const updatedWatchlist = Array.from(new Set([...watchlist, ...parsedItems]));
 
-  // Clear input box immediately
+  // Clear input box
   inputEl.value = "";
 
-  // Update UI and save to Cloudflare Worker KV
+  // Update DOM and send to Cloudflare Worker
   watchlist = updatedWatchlist;
   renderWatchlist();
   await saveWatchlistToBackend(watchlist);
@@ -78,13 +77,18 @@ async function saveWatchlistToBackend(updatedList) {
   try {
     const res = await fetch(`${API_BASE}/watchlist`, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { 
+        "Content-Type": "application/json" 
+      },
       body: JSON.stringify(updatedList),
     });
 
-    if (!res.ok) throw new Error("Server rejected request");
-    
-    // Fetch refreshed feeds with new watchlist applied
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok || data.ok === false) {
+      throw new Error(data.error || `HTTP ${res.status}`);
+    }
+
     await loadFeeds();
   } catch (err) {
     alert(`Could not save whitelist: ${err.message}`);
@@ -142,7 +146,7 @@ async function loadAlerts() {
 // ==========================================
 
 function renderWatchlist() {
-  const container = document.getElementById("watchlistContainer") || document.querySelector(".watchlist-tags");
+  const container = document.getElementById("watchlistContainer") || document.querySelector(".watchlist-tags") || document.querySelector(".whitelisted-chips");
   const countBadge = document.getElementById("watchlistCount");
 
   if (countBadge) countBadge.textContent = watchlist.length;
