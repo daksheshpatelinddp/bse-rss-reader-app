@@ -1,9 +1,8 @@
 /**
  * BSE Announcement Reader - Front-end JavaScript (app.js)
- * Project: bse-rss-reader-app
+ * Supports single inputs (e.g. 500325) and bulk list inputs (textarea/input)
  */
 
-// Targeted directly to the backend worker with the KV binding
 const API_BASE = "https://bse-rss-reader.daksheshpatelin.workers.dev";
 
 let watchlist = [];
@@ -19,17 +18,39 @@ async function initApp() {
   await refreshAll();
 }
 
+function getInputContainer() {
+  // Broad selector to capture input, textarea, or elements by ID/class
+  return (
+    document.getElementById("whitelistInput") ||
+    document.getElementById("watchlistInput") ||
+    document.querySelector("textarea") ||
+    document.querySelector("input[type='text']")
+  );
+}
+
 function setupEventListeners() {
-  const addBtn = document.getElementById("addBtn") || document.querySelector("button.add-btn") || document.querySelector(".add-btn");
-  const inputEl = document.getElementById("whitelistInput") || document.querySelector("input[type='text']");
+  const addBtn =
+    document.getElementById("addBtn") ||
+    document.querySelector("button.add-btn") ||
+    document.querySelector(".add-btn") ||
+    document.querySelector("button[type='submit']");
+
+  const inputEl = getInputContainer();
   const refreshBtn = document.getElementById("refreshBtn");
 
   if (addBtn && inputEl) {
-    addBtn.addEventListener("click", () => handleAddWatchlist(inputEl));
+    addBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      handleAddWatchlist();
+    });
+  }
+
+  if (inputEl) {
     inputEl.addEventListener("keypress", (e) => {
-      if (e.key === "Enter") {
+      // Allow Enter to submit only for single-line inputs, not textareas
+      if (e.key === "Enter" && inputEl.tagName !== "TEXTAREA") {
         e.preventDefault();
-        handleAddWatchlist(inputEl);
+        handleAddWatchlist();
       }
     });
   }
@@ -40,10 +61,17 @@ function setupEventListeners() {
 }
 
 // Watchlist operations
-async function handleAddWatchlist(inputEl) {
-  const rawValue = inputEl.value.trim();
-  if (!rawValue) return;
+async function handleAddWatchlist() {
+  const inputEl = getInputContainer();
+  if (!inputEl) {
+    alert("Could not find input box on page.");
+    return;
+  }
 
+  const rawValue = inputEl.value;
+  if (!rawValue || !rawValue.trim()) return;
+
+  // Split comma, newline, tab, or space separated inputs
   const parsedItems = rawValue
     .split(/[\n,\r\t]+/)
     .map((item) => item.trim())
@@ -51,7 +79,10 @@ async function handleAddWatchlist(inputEl) {
 
   if (parsedItems.length === 0) return;
 
+  // Merge with local state
   const updatedWatchlist = Array.from(new Set([...watchlist, ...parsedItems]));
+  
+  // Clear input box
   inputEl.value = "";
 
   watchlist = updatedWatchlist;
@@ -140,8 +171,17 @@ async function loadAlerts() {
 
 // UI Rendering
 function renderWatchlist() {
-  const container = document.getElementById("watchlistContainer") || document.querySelector(".watchlist-tags") || document.querySelector(".whitelisted-chips");
-  const countBadge = document.getElementById("watchlistCount") || document.querySelector(".whitelisted-count");
+  const container =
+    document.getElementById("watchlistContainer") ||
+    document.getElementById("whitelistContainer") ||
+    document.querySelector(".watchlist-tags") ||
+    document.querySelector(".whitelisted-chips") ||
+    document.querySelector(".tags-container");
+
+  const countBadge =
+    document.getElementById("watchlistCount") ||
+    document.getElementById("whitelistCount") ||
+    document.querySelector(".whitelisted-count");
 
   if (countBadge) countBadge.textContent = watchlist.length;
   if (!container) return;
