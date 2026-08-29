@@ -1,9 +1,9 @@
 /**
  * BSE Announcement Reader - Front-end JavaScript (app.js)
- * Routes API requests directly to the backend worker with KV binding.
+ * Project: bse-rss-reader-app
  */
 
-// Explicitly target the backend worker URL holding the BSE_DATA KV namespace
+// Targeted directly to the backend worker with the KV binding
 const API_BASE = "https://bse-rss-reader.daksheshpatelin.workers.dev";
 
 let watchlist = [];
@@ -39,15 +39,11 @@ function setupEventListeners() {
   }
 }
 
-// ==========================================
-// BULK INPUT & WATCHLIST MANAGEMENT
-// ==========================================
-
+// Watchlist operations
 async function handleAddWatchlist(inputEl) {
   const rawValue = inputEl.value.trim();
   if (!rawValue) return;
 
-  // Split comma, newline, or tab separated values into individual items
   const parsedItems = rawValue
     .split(/[\n,\r\t]+/)
     .map((item) => item.trim())
@@ -79,22 +75,26 @@ async function saveWatchlistToBackend(updatedList) {
       body: JSON.stringify(updatedList),
     });
 
-    const data = await res.json().catch(() => ({}));
-
-    if (!res.ok || data.ok === false) {
-      throw new Error(data.error || `HTTP ${res.status}`);
+    if (!res.ok) {
+      throw new Error(`HTTP ${res.status}`);
     }
 
+    const data = await res.json();
+    
+    if (data && Array.isArray(data.watchlist)) {
+      watchlist = data.watchlist;
+    } else if (Array.isArray(data)) {
+      watchlist = data;
+    }
+    
+    renderWatchlist();
     await loadFeeds();
   } catch (err) {
     alert(`Could not save whitelist: ${err.message}`);
   }
 }
 
-// ==========================================
-// API FETCHING
-// ==========================================
-
+// Data Loaders
 async function refreshAll() {
   await loadWatchlist();
   await loadFeeds();
@@ -105,7 +105,8 @@ async function loadWatchlist() {
   try {
     const res = await fetch(`${API_BASE}/watchlist`);
     if (res.ok) {
-      watchlist = await res.json();
+      const data = await res.json();
+      watchlist = Array.isArray(data) ? data : (data.watchlist || []);
       renderWatchlist();
     }
   } catch (e) {
@@ -137,10 +138,7 @@ async function loadAlerts() {
   }
 }
 
-// ==========================================
-// DOM RENDERING
-// ==========================================
-
+// UI Rendering
 function renderWatchlist() {
   const container = document.getElementById("watchlistContainer") || document.querySelector(".watchlist-tags") || document.querySelector(".whitelisted-chips");
   const countBadge = document.getElementById("watchlistCount") || document.querySelector(".whitelisted-count");
