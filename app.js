@@ -1,692 +1,365 @@
-const API = "https://bse-rss-reader.daksheshpatelin.workers.dev";
+/*
+ * BSE RSS READER - CLIENT APP
+ * Features: Watchlist management, category filtering, search, 
+ *           duplicate grouping, and dual top/bottom pagination.
+ */
 
-/* ============================================================
-   SETTINGS & STATE
-   ============================================================ */
+const WORKER_URL = "https://bse-rss-reader.daksheshpatelin.workers.dev"; // Update if your worker URL differs
+const ITEMS_PER_PAGE = 50;
 
-const PAGE_SIZE = 50;
-
-let allItems = [];
-let currentItems = [];
-let displayedItems = [];
-let categories = [];
+let rawAnnouncements = [];
+let filteredAnnouncements = [];
 let watchlist = [];
-let alerts = [];
-let currentFeed = "all";
+let currentCategory = "ALL";
 let currentPage = 1;
 let totalPages = 1;
 
 /* ============================================================
-   DOM ELEMENTS
+   INITIALIZATION & EVENT LISTENERS
    ============================================================ */
 
-const results = document.getElementById("results");
-const empty = document.getElementById("empty");
-const statusEl = document.getElementById("status");
-const lastUpdated = document.getElementById("lastUpdated");
-const categoryList = document.getElementById("categoryList");
-const categoryFilter = document.getElementById("categoryFilter");
-const searchInput = document.getElementById("searchInput");
-const currentFeedTitle = document.getElementById("currentFeedTitle");
-const currentFeedCount = document.getElementById("currentFeedCount");
-const totalCount = document.getElementById("totalCount");
-const alertCount = document.getElementById("alertCount");
-const watchCount = document.getElementById("watchCount");
-const whitelist = document.getElementById("whitelist");
+document.addEventListener("DOMContentLoaded", () => {
+  initEventListeners();
+  loadWatchlist();
+  fetchCategories();
+  fetchAnnouncements();
+});
 
-/* ============================================================
-   API HELPER
-   ============================================================ */
+function initEventListeners() {
+  // Refresh button
+  document.getElementById("refreshBtn").addEventListener("click", () => {
+    fetchAnnouncements();
+    fetchCategories();
+  });
 
-async function api(path, options = {}) {
-  const response = await fetch(API + path, options);
-  if (!response.ok) {
-    let message = `HTTP ${response.status}`;
-    try {
-      const data = await response.json();
-      if (data.error) message = data.error;
-    } catch (_) {}
-    throw new Error(message);
-  }
-  return response.json();
+  // Watchlist controls
+  document.getElementById("addWatchBtn").addEventListener("click", addWatchlistItem);
+  document.getElementById("watchInput").addEventListener("keypress", (e) => {
+    if (e.key === "Enter") addWatchlistItem();
+  });
+  document.getElementById("clearWatchlistBtn").addEventListener("click", clearWatchlist);
+  document.getElementById("csvFileInput").addEventListener("change", handleFileUpload);
+
+  // Filter & Feed Select
+  document.getElementById("searchInput").addEventListener("input", applyFilters);
+  document.getElementById("feedSelect").addEventListener("change", fetchAnnouncements);
+  document.getElementById("showAllBtn").addEventListener("click", () => {
+    selectCategory("ALL");
+  });
+
+  // Top Pagination Controls
+  document.getElementById("prevBtnTop").addEventListener("click", () => goToPage(currentPage - 1));
+  document.getElementById("nextBtnTop").addEventListener("click", () => goToPage(currentPage + 1));
+
+  // Bottom Pagination Controls
+  document.getElementById("prevBtnBottom").addEventListener("click", () => goToPage(currentPage - 1));
+  document.getElementById("nextBtnBottom").addEventListener("click", () => goToPage(currentPage + 1));
 }
 
-function setStatus(text) {
-  if (statusEl) statusEl.textContent = text;
-}
-
 /* ============================================================
-   FLEXIBLE PATTERN PARSING & WATCHLIST MANAGEMENT
+   SCROLL & PAGINATION HELPERS
    ============================================================ */
 
-/**
- * Extracts scrip code and company name from formats:
- * - "500325"
- * - "Reliance"
- * - "500325, Reliance"
- * - "500325 (Reliance)"
- * - "Reliance (500325)"
- */
-function parseCompanyInput(rawInput) {
-  const text = rawInput.trim();
-  if (!text) return null;
-
-  let scrip = "";
-  let name = "";
-
-  const scripMatch = text.match(/\b(\d{6})\b/);
-  if (scripMatch) {
-    scrip = scripMatch[1];
-    name = text.replace(scripMatch[0], "").replace(/[()]/g, "").trim();
+function scrollToAnnouncements() {
+  const target = document.querySelector(".current-feed");
+  if (target) {
+    target.scrollIntoView({ behavior: "smooth" });
   } else {
-    name = text;
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
-
-  return { scrip, name };
 }
+
+function goToPage(page) {
+  if (page < 1 || page > totalPages) return;
+  currentPage = page;
+  renderAnnouncements();
+  scrollToAnnouncements();
+}
+
+function updatePaginationUI() {
+  const pageText = `Page ${currentPage} of ${totalPages || 1}`;
+
+  // Update Top Bar
+  document.getElementById("pageInfoTop").textContent = pageText;
+  document.getElementById("prevBtnTop").disabled = currentPage <= 1;
+  document.getElementById("nextBtnTop").disabled = currentPage >= totalPages;
+
+  // Update Bottom Bar
+  document.getElementById("pageInfoBottom").textContent = pageText;
+  document.getElementById("prevBtnBottom").disabled = currentPage <= 1;
+  document.getElementById("nextBtnBottom").disabled = currentPage >= totalPages;
+}
+
+/* ============================================================
+   DATA FETCHING
+   ============================================================ */
+
+async function fetchAnnouncements() {
+  const feedType = document.getElementById("feedSelect").value;
+  const endpoint = feedType === "results" ? "/monitor" : "/bse-announcements";
+
+  document.getElementById("feedCount").textContent = "Loading announcements...";
+
+  try {
+    const res = await fetch(`${WORKER_URL}${endpoint}`);
+    const data = await res.json();
+
+    rawAnnouncements = data.items || data.newItems || [];
+    document.getElementById("lastUpdatedText").textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
+    
+    applyFilters();
+  } catch (err) {
+    console.error("Error fetching announcements:", err);
+    document.getElementById("feedCount").textContent = "Failed to load announcements.";
+  }
+}
+
+async function fetchCategories() {
+  try {
+    const res = await fetch(`${WORKER_URL}/categories`);
+    const data = await res.json();
+    renderCategories(data.categories || []);
+  } catch (err) {
+    console.error("Error fetching categories:", err);
+  }
+}
+
+/* ============================================================
+   WATCHLIST OPERATIONS
+   ============================================================ */
 
 async function loadWatchlist() {
   try {
-    const data = await api("/watchlist");
-    watchlist = Array.isArray(data.watchlist) ? data.watchlist : [];
+    const res = await fetch(`${WORKER_URL}/watchlist`);
+    const data = await res.json();
+    watchlist = data.watchlist || [];
     renderWatchlist();
-  } catch (error) {
-    console.error("Watchlist load:", error);
-    setStatus("Could not load whitelist.");
+  } catch (err) {
+    console.error("Error loading watchlist:", err);
   }
 }
 
 async function saveWatchlist() {
-  const data = await api("/watchlist", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ watchlist }),
-  });
-
-  if (Array.isArray(data.watchlist)) {
-    watchlist = data.watchlist;
-  }
   renderWatchlist();
-}
+  applyFilters();
 
-async function processBulkInput(rawText) {
-  if (!rawText || !rawText.trim()) return;
-
-  const entries = rawText
-    .split(/[\n,]+/)
-    .map((e) => e.trim())
-    .filter(Boolean);
-
-  let addedCount = 0;
-
-  entries.forEach((entry) => {
-    const parsed = parseCompanyInput(entry);
-    if (!parsed) return;
-
-    const exists = watchlist.some((item) => {
-      if (parsed.scrip && item.scrip) {
-        return String(item.scrip).trim() === parsed.scrip;
-      }
-      if (parsed.name && item.name) {
-        return (
-          String(item.name).trim().toLowerCase() === parsed.name.toLowerCase()
-        );
-      }
-      return false;
+  try {
+    await fetch(`${WORKER_URL}/watchlist`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ watchlist }),
     });
-
-    if (!exists) {
-      watchlist.push(parsed);
-      addedCount++;
-    }
-  });
-
-  if (addedCount > 0) {
-    try {
-      setStatus("Saving whitelist...");
-      await saveWatchlist();
-      setStatus(`Added ${addedCount} item(s) to whitelist.`);
-    } catch (error) {
-      console.error("Bulk add error:", error);
-      setStatus("Could not save whitelist.");
-    }
-  } else {
-    setStatus("No new items added (duplicates or invalid format).");
+  } catch (err) {
+    console.error("Error saving watchlist:", err);
   }
 }
 
-async function clearAllWatchlist() {
-  if (watchlist.length === 0) return;
+function addWatchlistItem() {
+  const input = document.getElementById("watchInput");
+  const value = input.value.trim();
+  if (!value) return;
 
-  if (!confirm("Are you sure you want to clear all whitelisted companies?")) {
-    return;
+  const isScrip = /^\d{6}$/.test(value);
+  const newItem = isScrip ? { scrip: value, name: "" } : { scrip: "", name: value };
+
+  if (!watchlist.some(w => (w.scrip && w.scrip === newItem.scrip) || (w.name && w.name.toLowerCase() === newItem.name.toLowerCase()))) {
+    watchlist.push(newItem);
+    saveWatchlist();
   }
 
-  const oldWatchlist = [...watchlist];
-  watchlist = [];
-  renderWatchlist();
-
-  try {
-    setStatus("Clearing whitelist...");
-    await saveWatchlist();
-    setStatus("Whitelist cleared successfully.");
-  } catch (error) {
-    console.error("Clear watchlist error:", error);
-    watchlist = oldWatchlist;
-    renderWatchlist();
-    setStatus("Could not clear whitelist.");
-  }
+  input.value = "";
 }
 
-async function removeWatch(index) {
-  if (index < 0 || index >= watchlist.length) return;
-
-  const oldWatchlist = [...watchlist];
+function removeWatchlistItem(index) {
   watchlist.splice(index, 1);
-  renderWatchlist();
+  saveWatchlist();
+}
 
-  try {
-    setStatus("Saving whitelist...");
-    await saveWatchlist();
-    setStatus("Whitelist updated.");
-  } catch (error) {
-    console.error("Whitelist remove error:", error);
-    watchlist = oldWatchlist;
-    renderWatchlist();
-    setStatus("Could not update whitelist.");
+function clearWatchlist() {
+  if (confirm("Are you sure you want to clear your entire watchlist?")) {
+    watchlist = [];
+    saveWatchlist();
   }
+}
+
+function handleFileUpload(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+
+  const reader = new FileReader();
+  reader.onload = function(event) {
+    const lines = event.target.result.split(/\r?\n/);
+    lines.forEach(line => {
+      const clean = line.trim();
+      if (clean) {
+        const isScrip = /^\d{6}$/.test(clean);
+        const newItem = isScrip ? { scrip: clean, name: "" } : { scrip: "", name: clean };
+        if (!watchlist.some(w => (w.scrip && w.scrip === newItem.scrip) || (w.name && w.name.toLowerCase() === newItem.name.toLowerCase()))) {
+          watchlist.push(newItem);
+        }
+      }
+    });
+    saveWatchlist();
+  };
+  reader.readAsText(file);
 }
 
 function renderWatchlist() {
-  if (!whitelist) return;
-
-  watchlist = Array.isArray(watchlist) ? watchlist : [];
-  if (watchCount) watchCount.textContent = watchlist.length;
-
-  whitelist.innerHTML = "";
-
+  const container = document.getElementById("whitelistContainer");
   if (watchlist.length === 0) {
-    whitelist.innerHTML = `<div class="muted">No companies whitelisted yet.</div>`;
+    container.innerHTML = '<span class="muted">No whitelisted companies added yet.</span>';
     return;
   }
 
-  watchlist.forEach((item, index) => {
-    const div = document.createElement("div");
-    div.className = "watch-item";
-
-    // CLEAN LABEL FORMATTING (Removed generic "BSE" prefix)
-    let label = "";
-    if (item.scrip && item.name) {
-      label = `${item.name} (${item.scrip})`;
-    } else if (item.scrip) {
-      label = `${item.scrip}`;
-    } else {
-      label = item.name || "Unknown";
-    }
-
-    div.innerHTML = `
-      <span>${escapeHtml(label)}</span>
-      <button type="button" class="remove-watch" data-index="${index}" title="Remove">×</button>
-    `;
-
-    whitelist.appendChild(div);
-  });
-
-  whitelist.querySelectorAll(".remove-watch").forEach((button) => {
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      removeWatch(Number(button.dataset.index));
-    });
-  });
+  container.innerHTML = watchlist.map((item, index) => `
+    <div class="watch-item">
+      <span>${item.name || item.scrip}</span>
+      <button class="remove-watch" onclick="removeWatchlistItem(${index})">&times;</button>
+    </div>
+  `).join("");
 }
 
 /* ============================================================
-   LOAD & RENDER BSE DATA
+   CATEGORIES & FILTERS
    ============================================================ */
 
-async function loadData() {
-  setStatus("Loading BSE announcements...");
+function renderCategories(categories) {
+  const container = document.getElementById("categoryList");
+  const totalCount = rawAnnouncements.length;
 
-  try {
-    const announcementData = await api("/bse-announcements");
-    allItems = Array.isArray(announcementData.items) ? announcementData.items : [];
-
-    const categoryData = await api("/categories");
-    categories = Array.isArray(categoryData.categories) ? categoryData.categories : [];
-
-    const alertData = await api("/alerts");
-    alerts = Array.isArray(alertData.items) ? alertData.items : [];
-
-    if (totalCount) totalCount.textContent = allItems.length.toLocaleString();
-    if (alertCount) alertCount.textContent = alerts.length;
-
-    renderCategories();
-    renderCategoryFilter();
-    selectFeed("all");
-
-    setStatus(`Loaded ${allItems.length.toLocaleString()} BSE announcements.`);
-    if (lastUpdated) lastUpdated.textContent = new Date().toLocaleTimeString();
-  } catch (error) {
-    console.error("Load error:", error);
-    setStatus("Error loading BSE announcements.");
-  }
-}
-
-function renderCategories() {
-  if (!categoryList) return;
-  categoryList.innerHTML = "";
-
-  const allButton = document.createElement("button");
-  allButton.type = "button";
-  allButton.className = "category-button all-category";
-  allButton.dataset.category = "all";
-  allButton.innerHTML = `<span>All Announcements</span><b>${allItems.length.toLocaleString()}</b>`;
-  allButton.addEventListener("click", () => {
-    selectFeed("all");
-    scrollToResults();
-  });
-  categoryList.appendChild(allButton);
-
-  categories.forEach((category) => {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.className = "category-button";
-    button.dataset.category = category.name;
-    button.innerHTML = `<span>${escapeHtml(category.name)}</span><b>${Number(category.count).toLocaleString()}</b>`;
-    button.addEventListener("click", () => {
-      selectFeed(category.name);
-      scrollToResults();
-    });
-    categoryList.appendChild(button);
-  });
-}
-
-function renderCategoryFilter() {
-  if (!categoryFilter) return;
-  categoryFilter.innerHTML = `<option value="all">All Categories</option>`;
-  categories.forEach((category) => {
-    const option = document.createElement("option");
-    option.value = category.name;
-    option.textContent = category.name;
-    categoryFilter.appendChild(option);
-  });
-}
-
-function selectFeed(feed) {
-  currentFeed = feed;
-  currentPage = 1;
-
-  if (feed === "all") {
-    currentItems = [...allItems];
-    if (currentFeedTitle) currentFeedTitle.textContent = "All BSE Announcements";
-  } else {
-    currentItems = allItems.filter((item) => {
-      if (item.category === feed) return true;
-      if (Array.isArray(item.categories)) return item.categories.includes(feed);
-      return false;
-    });
-    if (currentFeedTitle) currentFeedTitle.textContent = feed;
-  }
-
-  if (currentFeedCount) {
-    currentFeedCount.textContent = `${currentItems.length.toLocaleString()} announcements`;
-  }
-  if (categoryFilter) categoryFilter.value = feed === "all" ? "all" : feed;
-
-  updateCategoryHighlight();
-  applySearch();
-}
-
-function updateCategoryHighlight() {
-  document.querySelectorAll(".category-button").forEach((button) => {
-    button.classList.toggle("active", button.dataset.category === currentFeed);
-  });
-}
-
-function applySearch() {
-  const query = searchInput ? searchInput.value.trim().toLowerCase() : "";
-
-  if (!query) {
-    displayedItems = [...currentItems];
-  } else {
-    displayedItems = currentItems.filter((item) => {
-      const text = [
-        item.company,
-        item.scrip,
-        item.title,
-        item.description,
-        item.category,
-        ...(Array.isArray(item.categories) ? item.categories : []),
-      ]
-        .filter(Boolean)
-        .join(" ")
-        .toLowerCase();
-
-      return text.includes(query);
-    });
-  }
-
-  currentPage = 1;
-  renderPage();
-}
-
-function sortedItems(items) {
-  return [...items].sort((a, b) => new Date(b.pubDate || 0).getTime() - new Date(a.pubDate || 0).getTime());
-}
-
-function groupDuplicates(items) {
-  const map = new Map();
-  for (const item of items) {
-    const key = [item.company || "", item.title || "", item.description || ""].join("|").trim().toLowerCase();
-    if (!map.has(key)) {
-      map.set(key, { item, items: [item] });
-    } else {
-      map.get(key).items.push(item);
-    }
-  }
-  return Array.from(map.values());
-}
-
-function renderPage() {
-  if (!results) return;
-  results.innerHTML = "";
-
-  if (displayedItems.length === 0) {
-    if (empty) empty.classList.remove("hidden");
-    renderPagination(0, 0);
-    return;
-  }
-
-  if (empty) empty.classList.add("hidden");
-
-  const sorted = sortedItems(displayedItems);
-  totalPages = Math.max(1, Math.ceil(sorted.length / PAGE_SIZE));
-
-  if (currentPage > totalPages) currentPage = totalPages;
-
-  const start = (currentPage - 1) * PAGE_SIZE;
-  const pageItems = sorted.slice(start, start + PAGE_SIZE);
-  const groups = groupDuplicates(pageItems);
-
-  groups.forEach((group) => {
-    results.appendChild(createAnnouncementCard(group.item, group.items));
-  });
-
-  renderPagination(sorted.length, totalPages);
-}
-
-function createAnnouncementCard(item, groupedItems = [item]) {
-  const card = document.createElement("article");
-  card.className = "announcement-card";
-
-  const whitelisted = isWhitelisted(item);
-  const categoriesText = Array.isArray(item.categories) ? item.categories.join(" • ") : item.category || "Other";
-  const date = formatDate(item.pubDate);
-  const duplicateCount = groupedItems.length;
-
-  card.innerHTML = `
-    <div class="announcement-top">
-      <div class="company">
-        ${escapeHtml(item.company || "Unknown Company")}
-        ${item.scrip ? `<span class="scrip">${escapeHtml(item.scrip)}</span>` : ""}
-      </div>
-      ${whitelisted ? `<span class="watch-badge">⭐ Whitelisted</span>` : ""}
-    </div>
-
-    <div class="category-tags">
-      ${categoriesText.split(" • ").map((cat) => `<span class="tag">${escapeHtml(cat)}</span>`).join("")}
-    </div>
-
-    <h3>
-      ${item.link ? `<a href="${escapeAttr(item.link)}" target="_blank" rel="noopener noreferrer">${escapeHtml(item.title || "BSE Announcement")}</a>` : escapeHtml(item.title || "BSE Announcement")}
-    </h3>
-
-    ${item.description ? `<div class="description">${escapeHtml(item.description)}</div>` : ""}
-
-    <div class="announcement-bottom">
-      <span>${escapeHtml(date)}</span>
-      <span class="bottom-right">
-        ${item.isFinancialResult ? `<span class="result-badge">Financial Result</span>` : ""}
-        ${duplicateCount > 1 ? `<button type="button" class="duplicate-btn">${duplicateCount} similar announcements</button>` : ""}
-      </span>
-    </div>
-
-    ${
-      duplicateCount > 1
-        ? `<div class="duplicate-list hidden">
-            ${groupedItems
-              .map(
-                (dup, idx) => `
-                <div class="duplicate-item">
-                  <div>${idx + 1}. ${escapeHtml(formatDate(dup.pubDate))}</div>
-                  ${dup.link ? `<a href="${escapeAttr(dup.link)}" target="_blank" rel="noopener noreferrer">Open announcement</a>` : ""}
-                </div>`
-              )
-              .join("")}
-          </div>`
-        : ""
-    }
+  let html = `
+    <button class="category-button all-category ${currentCategory === 'ALL' ? 'active' : ''}" onclick="selectCategory('ALL')">
+      <span>All Announcements</span>
+      <b>${totalCount}</b>
+    </button>
   `;
 
-  if (duplicateCount > 1) {
-    const button = card.querySelector(".duplicate-btn");
-    const list = card.querySelector(".duplicate-list");
-    if (button && list) {
-      button.addEventListener("click", (e) => {
-        e.preventDefault();
-        list.classList.toggle("hidden");
-        button.textContent = list.classList.contains("hidden")
-          ? `${duplicateCount} similar announcements`
-          : "Hide similar announcements";
-      });
-    }
-  }
+  categories.forEach(cat => {
+    html += `
+      <button class="category-button ${currentCategory === cat.name ? 'active' : ''}" onclick="selectCategory('${cat.name}')">
+        <span>${cat.name}</span>
+        <b>${cat.count}</b>
+      </button>
+    `;
+  });
 
-  return card;
+  container.innerHTML = html;
 }
 
-function isWhitelisted(item) {
-  return watchlist.some((watch) => {
-    if (watch.scrip && item.scrip) {
-      if (String(watch.scrip).trim() === String(item.scrip).trim()) return true;
-    }
-    if (watch.name && item.company) {
-      const watchName = String(watch.name).trim().toLowerCase();
-      const companyName = String(item.company).trim().toLowerCase();
-      if (watchName.length >= 3 && companyName.includes(watchName)) return true;
-    }
+function selectCategory(category) {
+  currentCategory = category;
+  document.getElementById("feedTitle").textContent = category === "ALL" ? "All Announcements" : category;
+  
+  const showAllBtn = document.getElementById("showAllBtn");
+  if (category === "ALL") {
+    showAllBtn.classList.add("hidden");
+  } else {
+    showAllBtn.classList.remove("hidden");
+  }
+
+  fetchCategories();
+  applyFilters();
+}
+
+function matchesWatchlistClient(item) {
+  if (watchlist.length === 0) return false;
+  const scrip = String(item.scrip || "").trim();
+  const company = String(item.company || "").toLowerCase().trim();
+
+  return watchlist.some(w => {
+    if (w.scrip && scrip && w.scrip === scrip) return true;
+    if (w.name && company && company.includes(w.name.toLowerCase().trim())) return true;
     return false;
   });
 }
 
-async function showAlerts() {
-  try {
-    const data = await api("/alerts");
-    alerts = Array.isArray(data.items) ? data.items : [];
+function applyFilters() {
+  const searchText = document.getElementById("searchInput").value.toLowerCase().trim();
 
-    if (alertCount) alertCount.textContent = alerts.length;
-
-    currentFeed = "alerts";
-    currentItems = [...alerts];
-
-    if (currentFeedTitle) currentFeedTitle.textContent = "⭐ Alerts / Special Bundle";
-    if (currentFeedCount) currentFeedCount.textContent = `${alerts.length} alerts`;
-    if (categoryFilter) categoryFilter.value = "all";
-
-    document.querySelectorAll(".category-button").forEach((btn) => btn.classList.remove("active"));
-    currentPage = 1;
-    applySearch();
-  } catch (error) {
-    console.error("Alerts:", error);
-    setStatus("Could not load alerts.");
-  }
-}
-
-function renderPagination(total, pages) {
-  let old = document.getElementById("pagination");
-  if (!old) {
-    old = document.createElement("div");
-    old.id = "pagination";
-    old.className = "pagination";
-    if (results && results.parentNode) {
-      results.parentNode.insertBefore(old, results.nextSibling);
+  filteredAnnouncements = rawAnnouncements.filter(item => {
+    // Category match
+    if (currentCategory !== "ALL" && !item.categories?.includes(currentCategory)) {
+      return false;
     }
-  }
 
-  old.innerHTML = "";
-  if (total === 0 || pages <= 1) return;
+    // Search match
+    if (searchText) {
+      const title = String(item.title || "").toLowerCase();
+      const desc = String(item.description || "").toLowerCase();
+      const company = String(item.company || "").toLowerCase();
+      const scrip = String(item.scrip || "");
 
-  const previous = document.createElement("button");
-  previous.type = "button";
-  previous.textContent = "‹ Previous";
-  previous.disabled = currentPage <= 1;
-  previous.addEventListener("click", () => {
-    if (currentPage > 1) {
-      currentPage--;
-      renderPage();
-      scrollToResults();
+      return title.includes(searchText) || desc.includes(searchText) || company.includes(searchText) || scrip.includes(searchText);
     }
+
+    return true;
   });
-  old.appendChild(previous);
 
-  const info = document.createElement("span");
-  info.textContent = `Page ${currentPage} of ${pages}`;
-  old.appendChild(info);
+  currentPage = 1;
+  totalPages = Math.ceil(filteredAnnouncements.length / ITEMS_PER_PAGE) || 1;
 
-  const next = document.createElement("button");
-  next.type = "button";
-  next.textContent = "Next ›";
-  next.disabled = currentPage >= pages;
-  next.addEventListener("click", () => {
-    if (currentPage < pages) {
-      currentPage++;
-      renderPage();
-      scrollToResults();
-    }
-  });
-  old.appendChild(next);
-}
-
-function scrollToResults() {
-  if (results) results.scrollIntoView({ behavior: "smooth", block: "start" });
-}
-
-function formatDate(value) {
-  if (!value) return "";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString();
-}
-
-function escapeHtml(value) {
-  return String(value || "")
-    .replace(/&/g, "&amp;")
-    .replace(/</g, "&lt;")
-    .replace(/>/g, "&gt;")
-    .replace(/"/g, "&quot;")
-    .replace(/'/g, "&#039;");
-}
-
-function escapeAttr(value) {
-  return escapeHtml(value);
+  document.getElementById("feedCount").textContent = `${filteredAnnouncements.length} item(s) found`;
+  renderAnnouncements();
 }
 
 /* ============================================================
-   EVENTS & BINDINGS
+   RENDER ANNOUNCEMENTS
    ============================================================ */
 
-function setupWatchlistHandlers() {
-  const addButton = document.getElementById("addBtn");
-  const companyInput = document.getElementById("companyInput");
-  const clearBtn = document.getElementById("clearWatchlistBtn");
-  const fileInput = document.getElementById("fileUploadInput");
+function renderAnnouncements() {
+  const container = document.getElementById("results");
 
-  if (addButton) {
-    addButton.addEventListener("click", (e) => {
-      e.preventDefault();
-      if (companyInput && companyInput.value) {
-        processBulkInput(companyInput.value);
-        companyInput.value = "";
-      }
-    });
+  if (filteredAnnouncements.length === 0) {
+    container.innerHTML = '<div class="empty">No announcements found matching your criteria.</div>';
+    updatePaginationUI();
+    return;
   }
 
-  if (companyInput) {
-    companyInput.addEventListener("keydown", (e) => {
-      if (e.key === "Enter") {
-        e.preventDefault();
-        processBulkInput(companyInput.value);
-        companyInput.value = "";
-      }
-    });
-  }
+  const start = (currentPage - 1) * ITEMS_PER_PAGE;
+  const end = start + ITEMS_PER_PAGE;
+  const pageItems = filteredAnnouncements.slice(start, end);
 
-  if (clearBtn) {
-    clearBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      clearAllWatchlist();
-    });
-  }
+  container.innerHTML = pageItems.map(item => {
+    const isWhitelisted = matchesWatchlistClient(item);
+    const bseLink = item.scrip 
+      ? `https://www.bseindia.com/stock-share-price/${item.scrip}`
+      : (item.link || "https://www.bseindia.com");
 
-  if (fileInput) {
-    fileInput.addEventListener("change", (e) => {
-      const file = e.target.files[0];
-      if (!file) return;
+    const categoryTags = (item.categories || [item.category || "General"])
+      .map(c => `<span class="tag">${c}</span>`)
+      .join("");
 
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        processBulkInput(event.target.result);
-        fileInput.value = "";
-      };
-      reader.readAsText(file);
-    });
-  }
+    return `
+      <article class="announcement-card">
+        <div class="announcement-top">
+          <div>
+            <span class="company">${item.company || "Unknown Company"}</span>
+            ${item.scrip ? `<span class="scrip">${item.scrip}</span>` : ""}
+          </div>
+          ${isWhitelisted ? '<span class="watch-badge">⭐ Watchlist</span>' : ""}
+        </div>
+
+        <div class="category-tags">
+          ${categoryTags}
+        </div>
+
+        <h3>
+          <a href="${bseLink}" target="_blank" rel="noopener noreferrer">
+            ${item.title || "Untitled Announcement"}
+          </a>
+        </h3>
+
+        ${item.description ? `<div class="description">${item.description}</div>` : ""}
+
+        <div class="announcement-bottom">
+          <span>📅 ${item.pubDate ? new Date(item.pubDate).toLocaleString() : "Recently"}</span>
+          <div class="bottom-right">
+            ${item.isFinancialResult ? '<span class="result-badge">📊 Financial Result</span>' : ""}
+          </div>
+        </div>
+      </article>
+    `;
+  }).join("");
+
+  updatePaginationUI();
 }
-
-const refreshBtn = document.getElementById("refreshBtn");
-if (refreshBtn) {
-  refreshBtn.addEventListener("click", async (e) => {
-    e.preventDefault();
-    await loadWatchlist();
-    await loadData();
-  });
-}
-
-const allBtn = document.getElementById("allBtn");
-if (allBtn) {
-  allBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    selectFeed("all");
-    scrollToResults();
-  });
-}
-
-const alertsBtn = document.getElementById("alertsBtn");
-if (alertsBtn) {
-  alertsBtn.addEventListener("click", (e) => {
-    e.preventDefault();
-    showAlerts();
-    scrollToResults();
-  });
-}
-
-if (searchInput) {
-  searchInput.addEventListener("input", () => applySearch());
-}
-
-if (categoryFilter) {
-  categoryFilter.addEventListener("change", (e) => {
-    selectFeed(e.target.value);
-    scrollToResults();
-  });
-}
-
-/* ============================================================
-   INIT
-   ============================================================ */
-
-(async function init() {
-  setupWatchlistHandlers();
-  await loadWatchlist();
-  await loadData();
-})();
