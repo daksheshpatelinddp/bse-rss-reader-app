@@ -2,273 +2,122 @@
 <html lang="en">
 
 <head>
-
   <meta charset="UTF-8">
-
-  <meta
-    name="viewport"
-    content="width=device-width, initial-scale=1.0"
-  >
-
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>BSE Announcement Reader</title>
-
-  <link
-    rel="stylesheet"
-    href="style.css"
-  >
-
+  <link rel="stylesheet" href="style.css">
 </head>
-
 
 <body>
 
   <!-- ======================================================
        HEADER
        ====================================================== -->
-
   <header class="topbar">
-
     <div>
-
-      <h1>
-        BSE Announcement Reader
-      </h1>
-
-      <div class="subtitle">
-        BSE Corporate Announcements
-      </div>
-
+      <h1>BSE Announcement Reader</h1>
+      <div class="subtitle">BSE Corporate Announcements</div>
     </div>
-
-
-    <button
-      id="refreshBtn"
-      class="refresh-btn"
-    >
-      ↻ Refresh
-    </button>
-
+    <button id="refreshBtn" class="refresh-btn">↻ Refresh</button>
   </header>
 
-
-
   <main>
-
 
     <!-- ====================================================
          WATCHLIST
          ==================================================== -->
-
     <section class="panel">
-
       <div class="panel-title">
-
-        <h2>
-          Whitelisted Companies
-        </h2>
-
-        <span id="watchCount">
-          0
-        </span>
-
+        <h2>Whitelisted Companies</h2>
+        <div class="panel-actions">
+          <span id="watchCount">0</span>
+          <button id="clearWatchlistBtn" type="button" class="clear-btn" title="Clear all whitelisted companies">Clear All</button>
+        </div>
       </div>
 
-
       <div class="add-row">
-
         <input
           id="companyInput"
           type="text"
-          placeholder="Company name or BSE scrip"
+          placeholder="Enter 500325, Reliance, RIL, 500325 (Reliance), or comma-separated list..."
           autocomplete="off"
         >
-
-        <button id="addBtn">
-          + Add
-        </button>
-
+        <button id="addBtn" type="button">+ Add</button>
       </div>
 
+      <div class="file-upload-row">
+        <label for="fileUploadInput" class="file-upload-label">📁 Upload Text/CSV File</label>
+        <input id="fileUploadInput" type="file" accept=".txt,.csv" class="hidden-file-input">
+      </div>
 
-      <div
-        id="whitelist"
-        class="whitelist"
-      ></div>
-
+      <div id="whitelist" class="whitelist"></div>
     </section>
-
-
 
     <!-- ====================================================
          SPECIAL ALERTS
          ==================================================== -->
-
     <section class="panel alert-panel">
-
       <div class="panel-title">
-
-        <h2>
-          ⭐ Alerts / Special Bundle
-        </h2>
-
-        <span id="alertCount">
-          0
-        </span>
-
+        <h2>⭐ Alerts / Special Bundle</h2>
+        <span id="alertCount">0</span>
       </div>
-
-
-      <button
-        id="alertsBtn"
-        class="category-button special"
-      >
-        Open Alerts
-      </button>
-
+      <button id="alertsBtn" class="category-button special">Open Alerts</button>
     </section>
-
-
 
     <!-- ====================================================
          FEEDS / CATEGORIES
          ==================================================== -->
-
     <section class="panel">
-
       <div class="panel-title">
-
-        <h2>
-          BSE Announcement Feeds
-        </h2>
-
-        <span id="totalCount">
-          0
-        </span>
-
+        <h2>BSE Announcement Feeds</h2>
+        <span id="totalCount">0</span>
       </div>
-
-
-      <div
-        id="categoryList"
-        class="category-list"
-      ></div>
-
+      <div id="categoryList" class="category-list"></div>
     </section>
-
-
 
     <!-- ====================================================
          CURRENT FEED
          ==================================================== -->
-
     <section class="panel">
-
       <div class="current-feed">
-
         <div>
-
-          <div
-            id="currentFeedTitle"
-            class="feed-title"
-          >
-            All Announcements
-          </div>
-
-          <div
-            id="currentFeedCount"
-            class="feed-count"
-          >
-            0 announcements
-          </div>
-
+          <div id="currentFeedTitle" class="feed-title">All Announcements</div>
+          <div id="currentFeedCount" class="feed-count">0 announcements</div>
         </div>
-
-
-        <button
-          id="allBtn"
-          class="all-btn"
-        >
-          All Announcements
-        </button>
-
+        <button id="allBtn" class="all-btn">All Announcements</button>
       </div>
-
     </section>
-
-
 
     <!-- ====================================================
          SEARCH / FILTER
          ==================================================== -->
-
     <section class="panel filters">
-
       <div class="filter-row">
-
-        <input
-          id="searchInput"
-          type="search"
-          placeholder="Search company, scrip or announcement..."
-        >
-
+        <input id="searchInput" type="search" placeholder="Search company, scrip or announcement...">
         <select id="categoryFilter">
-
-          <option value="all">
-            Current Feed: All
-          </option>
-
+          <option value="all">Current Feed: All</option>
         </select>
-
       </div>
-
     </section>
-
-
 
     <!-- ====================================================
          STATUS
          ==================================================== -->
-
     <section class="status-bar">
-
-      <span id="status">
-        Loading BSE announcements...
-      </span>
-
+      <span id="status">Loading BSE announcements...</span>
       <span id="lastUpdated"></span>
-
     </section>
-
-
 
     <!-- ====================================================
          ANNOUNCEMENTS
          ==================================================== -->
-
     <section>
-
-      <div
-        id="results"
-        class="results"
-      ></div>
-
-
-      <div
-        id="empty"
-        class="empty hidden"
-      >
-        No announcements found.
-      </div>
-
+      <div id="results" class="results"></div>
+      <div id="empty" class="empty hidden">No announcements found.</div>
     </section>
-
 
   </main>
 
-
-
   <script src="app.js"></script>
-
 </body>
-
 </html>
