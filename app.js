@@ -3,12 +3,21 @@ const API =
 
 
 /* ============================================================
+   SETTINGS
+   ============================================================ */
+
+const PAGE_SIZE = 50;
+
+
+/* ============================================================
    STATE
    ============================================================ */
 
 let allItems = [];
 
 let currentItems = [];
+
+let displayedItems = [];
 
 let categories = [];
 
@@ -17,6 +26,10 @@ let watchlist = [];
 let alerts = [];
 
 let currentFeed = "all";
+
+let currentPage = 1;
+
+let totalPages = 1;
 
 
 /* ============================================================
@@ -55,29 +68,20 @@ const currentFeedCount =
   );
 
 const totalCount =
-  document.getElementById(
-    "totalCount"
-  );
+  document.getElementById("totalCount");
 
 const alertCount =
-  document.getElementById(
-    "alertCount"
-  );
+  document.getElementById("alertCount");
 
 const watchCount =
-  document.getElementById(
-    "watchCount"
-  );
+  document.getElementById("watchCount");
 
 const whitelist =
-  document.getElementById(
-    "whitelist"
-  );
-
+  document.getElementById("whitelist");
 
 
 /* ============================================================
-   API HELPER
+   API
    ============================================================ */
 
 async function api(
@@ -91,22 +95,49 @@ async function api(
       options
     );
 
-
   if (!response.ok) {
 
+    let message =
+      `HTTP ${response.status}`;
+
+    try {
+
+      const data =
+        await response.json();
+
+      if (data.error) {
+        message =
+          data.error;
+      }
+
+    } catch (_) {}
+
     throw new Error(
-      `HTTP ${response.status}`
+      message
     );
   }
-
 
   return response.json();
 }
 
 
+/* ============================================================
+   STATUS
+   ============================================================ */
+
+function setStatus(
+  text
+) {
+
+  if (statusEl) {
+    statusEl.textContent =
+      text;
+  }
+}
+
 
 /* ============================================================
-   LOAD WATCHLIST
+   WATCHLIST
    ============================================================ */
 
 async function loadWatchlist() {
@@ -118,7 +149,6 @@ async function loadWatchlist() {
         "/watchlist"
       );
 
-
     watchlist =
       Array.isArray(
         data.watchlist
@@ -126,27 +156,29 @@ async function loadWatchlist() {
         ? data.watchlist
         : [];
 
-
     renderWatchlist();
 
   } catch (error) {
 
     console.error(
-      "Watchlist error:",
+      "Watchlist load:",
       error
+    );
+
+    setStatus(
+      "Could not load whitelist."
     );
   }
 }
 
 
-
 /* ============================================================
-   SAVE WATCHLIST
+   SAVE WATCHLIST TO CLOUDFLARE KV
    ============================================================ */
 
 async function saveWatchlist() {
 
-  const response =
+  const data =
     await api(
       "/watchlist",
       {
@@ -155,29 +187,36 @@ async function saveWatchlist() {
 
         headers: {
           "Content-Type":
-            "application/json",
+            "application/json"
         },
 
         body:
           JSON.stringify({
-            watchlist,
-          }),
+            watchlist:
+              watchlist
+          })
       }
     );
 
 
-  watchlist =
-    response.watchlist ||
-    watchlist;
+  if (
+    Array.isArray(
+      data.watchlist
+    )
+  ) {
+
+    watchlist =
+      data.watchlist;
+
+  }
 
 
   renderWatchlist();
 }
 
 
-
 /* ============================================================
-   ADD WATCHLIST ITEM
+   ADD WATCHLIST COMPANY
    ============================================================ */
 
 async function addWatch() {
@@ -187,69 +226,249 @@ async function addWatch() {
       "companyInput"
     );
 
+  if (!input) {
+    return;
+  }
+
 
   const value =
     input.value.trim();
 
 
   if (!value) {
+
+    setStatus(
+      "Enter a BSE scrip code."
+    );
+
+    input.focus();
+
     return;
   }
 
 
   /*
-   * If it is a six-digit BSE scrip,
-   * save it as scrip.
+   * PRIMARY METHOD:
+   *
+   * Six digits = BSE scrip.
    */
+
   if (
     /^\d{6}$/.test(
       value
     )
   ) {
 
-    if (
-      !watchlist.some(
+    const alreadyExists =
+      watchlist.some(
         item =>
           String(
-            item.scrip
-          ) === value
-      )
+            item.scrip || ""
+          ).trim() ===
+          value
+      );
+
+
+    if (
+      alreadyExists
     ) {
 
-      watchlist.push({
-        scrip:
-          value,
-      });
+      setStatus(
+        "This scrip is already whitelisted."
+      );
+
+      input.value =
+        "";
+
+      return;
     }
+
+
+    /*
+     * Store the scrip only.
+     * Worker will use the scrip
+     * for exact matching.
+     */
+
+    watchlist.push({
+      scrip:
+        value
+    });
 
   } else {
 
     /*
-     * Otherwise save as company name.
+     * Name matching is still supported
+     * for compatibility.
      */
-    if (
-      !watchlist.some(
+
+    const name =
+      value.toLowerCase();
+
+
+    const alreadyExists =
+      watchlist.some(
         item =>
           String(
             item.name || ""
-          ).toLowerCase() ===
-          value.toLowerCase()
-      )
+          )
+            .trim()
+            .toLowerCase() ===
+          name
+      );
+
+
+    if (
+      alreadyExists
     ) {
 
-      watchlist.push({
-        name:
-          value,
-      });
+      setStatus(
+        "This company is already whitelisted."
+      );
+
+      input.value =
+        "";
+
+      return;
     }
+
+
+    watchlist.push({
+      name:
+        value
+    });
+
   }
 
 
-  input.value =
-    "";
+  /*
+   * Keep value until save succeeds.
+   * This prevents losing the entry if
+   * the network request fails.
+   */
+
+  try {
+
+    setStatus(
+      "Saving whitelist..."
+    );
+
+    await saveWatchlist();
+
+    input.value =
+      "";
+
+    setStatus(
+      "Whitelist saved successfully."
+    );
+
+  } catch (error) {
+
+    console.error(
+      "Whitelist save:",
+      error
+    );
+
+
+    /*
+     * Undo the locally added item
+     * if Cloudflare rejected the save.
+     */
+
+    watchlist =
+      watchlist.filter(
+        (item, index) => {
+
+          /*
+           * Remove the newest
+           * matching item only.
+           */
+
+          if (
+            /^\d{6}$/.test(
+              value
+            )
+          ) {
+
+            return !(
+              index ===
+                watchlist.length - 1 &&
+              String(
+                item.scrip || ""
+              ) === value
+            );
+
+          }
+
+
+          return !(
+            index ===
+              watchlist.length - 1 &&
+            String(
+              item.name || ""
+            )
+              .toLowerCase() ===
+              value.toLowerCase()
+          );
+
+        }
+      );
+
+
+    renderWatchlist();
+
+
+    setStatus(
+      "Could not save whitelist."
+    );
+
+    alert(
+      "Could not save whitelist.\n\n" +
+      String(
+        error?.message ||
+        error
+      )
+    );
+
+  }
+
+}
+
+
+/* ============================================================
+   REMOVE WATCHLIST COMPANY
+   ============================================================ */
+
+async function removeWatch(
+  index
+) {
+
+  if (
+    index < 0 ||
+    index >= watchlist.length
+  ) {
+    return;
+  }
+
+
+  const oldWatchlist =
+    [...watchlist];
+
+
+  watchlist.splice(
+    index,
+    1
+  );
+
+
+  renderWatchlist();
 
 
   try {
+
+    setStatus(
+      "Saving whitelist..."
+    );
 
     await saveWatchlist();
 
@@ -259,51 +478,48 @@ async function addWatch() {
 
   } catch (error) {
 
+    console.error(
+      "Whitelist remove:",
+      error
+    );
+
+
+    /*
+     * Restore if saving failed.
+     */
+
+    watchlist =
+      oldWatchlist;
+
+    renderWatchlist();
+
     setStatus(
-      "Could not save whitelist."
+      "Could not update whitelist."
     );
 
-    console.error(
-      error
+    alert(
+      "Could not update whitelist.\n\n" +
+      String(
+        error?.message ||
+        error
+      )
     );
+
   }
+
 }
 
 
-
 /* ============================================================
-   REMOVE WATCHLIST ITEM
-   ============================================================ */
-
-async function removeWatch(
-  index
-) {
-
-  watchlist.splice(
-    index,
-    1
-  );
-
-
-  try {
-
-    await saveWatchlist();
-
-  } catch (error) {
-
-    console.error(
-      error
-    );
-  }
-}
-
-
-
-/* ============================================================
-   RENDER WATCHLIST
+   DISPLAY WHITELIST
    ============================================================ */
 
 function renderWatchlist() {
+
+  if (!whitelist) {
+    return;
+  }
+
 
   watchlist =
     Array.isArray(
@@ -313,8 +529,12 @@ function renderWatchlist() {
       : [];
 
 
-  watchCount.textContent =
-    watchlist.length;
+  if (watchCount) {
+
+    watchCount.textContent =
+      watchlist.length;
+
+  }
 
 
   whitelist.innerHTML =
@@ -326,9 +546,11 @@ function renderWatchlist() {
   ) {
 
     whitelist.innerHTML =
-      `<div class="muted">
-         No companies whitelisted.
-       </div>`;
+      `
+      <div class="muted">
+        No companies whitelisted yet.
+      </div>
+      `;
 
     return;
   }
@@ -350,33 +572,40 @@ function renderWatchlist() {
       const label =
         item.scrip
           ? `BSE ${item.scrip}`
-          : item.name;
+          : (
+              item.name ||
+              "Unknown"
+            );
 
 
-      div.innerHTML = `
-
+      div.innerHTML =
+        `
         <span>
-          ${escapeHtml(label)}
+          ${escapeHtml(
+            label
+          )}
         </span>
 
         <button
-          data-index="${index}"
+          type="button"
           class="remove-watch"
+          data-index="${index}"
+          title="Remove"
         >
           ×
         </button>
-
-      `;
+        `;
 
 
       whitelist.appendChild(
         div
       );
+
     }
   );
 
 
-  document
+  whitelist
     .querySelectorAll(
       ".remove-watch"
     )
@@ -385,21 +614,29 @@ function renderWatchlist() {
 
         button.addEventListener(
           "click",
-          () =>
+          function(event) {
+
+            event.preventDefault();
+
+            event.stopPropagation();
+
             removeWatch(
               Number(
                 button.dataset.index
               )
-            )
+            );
+
+          }
         );
+
       }
     );
+
 }
 
 
-
 /* ============================================================
-   LOAD ALL DATA
+   LOAD BSE DATA
    ============================================================ */
 
 async function loadData() {
@@ -411,9 +648,6 @@ async function loadData() {
 
   try {
 
-    /*
-     * Get the actual announcements.
-     */
     const announcementData =
       await api(
         "/bse-announcements"
@@ -428,9 +662,6 @@ async function loadData() {
         : [];
 
 
-    /*
-     * Get category counts.
-     */
     const categoryData =
       await api(
         "/categories"
@@ -445,9 +676,6 @@ async function loadData() {
         : [];
 
 
-    /*
-     * Get alerts.
-     */
     const alertData =
       await api(
         "/alerts"
@@ -462,17 +690,27 @@ async function loadData() {
         : [];
 
 
-    totalCount.textContent =
-      allItems.length;
+    if (totalCount) {
+
+      totalCount.textContent =
+        allItems.length
+          .toLocaleString();
+
+    }
 
 
-    alertCount.textContent =
-      alerts.length;
+    if (alertCount) {
+
+      alertCount.textContent =
+        alerts.length;
+
+    }
 
 
     renderCategories();
 
     renderCategoryFilter();
+
 
     selectFeed(
       "all"
@@ -484,9 +722,13 @@ async function loadData() {
     );
 
 
-    lastUpdated.textContent =
-      new Date().toLocaleTimeString();
+    if (lastUpdated) {
 
+      lastUpdated.textContent =
+        new Date()
+          .toLocaleTimeString();
+
+    }
 
   } catch (error) {
 
@@ -495,50 +737,75 @@ async function loadData() {
       error
     );
 
-
     setStatus(
       "Error loading BSE announcements."
     );
+
   }
+
 }
 
 
-
 /* ============================================================
-   RENDER CATEGORY BUTTONS
+   CATEGORIES
    ============================================================ */
 
 function renderCategories() {
+
+  if (!categoryList) {
+    return;
+  }
+
 
   categoryList.innerHTML =
     "";
 
 
   /*
-   * ALL ANNOUNCEMENTS button.
+   * ALL ANNOUNCEMENTS
    */
+
   const allButton =
     document.createElement(
       "button"
     );
 
 
+  allButton.type =
+    "button";
+
+
   allButton.className =
     "category-button all-category";
 
 
-  allButton.innerHTML = `
-    <span>All Announcements</span>
-    <b>${allItems.length}</b>
-  `;
+  allButton.dataset.category =
+    "all";
+
+
+  allButton.innerHTML =
+    `
+    <span>
+      All Announcements
+    </span>
+
+    <b>
+      ${allItems.length.toLocaleString()}
+    </b>
+    `;
 
 
   allButton.addEventListener(
     "click",
-    () =>
+    () => {
+
       selectFeed(
         "all"
-      )
+      );
+
+      scrollToResults();
+
+    }
   );
 
 
@@ -548,8 +815,9 @@ function renderCategories() {
 
 
   /*
-   * Category buttons.
+   * EVERY CATEGORY
    */
+
   categories.forEach(
     category => {
 
@@ -557,6 +825,10 @@ function renderCategories() {
         document.createElement(
           "button"
         );
+
+
+      button.type =
+        "button";
 
 
       button.className =
@@ -567,7 +839,8 @@ function renderCategories() {
         category.name;
 
 
-      button.innerHTML = `
+      button.innerHTML =
+        `
         <span>
           ${escapeHtml(
             category.name
@@ -579,37 +852,50 @@ function renderCategories() {
             category.count
           ).toLocaleString()}
         </b>
-      `;
+        `;
 
 
       button.addEventListener(
         "click",
-        () =>
+        () => {
+
           selectFeed(
             category.name
-          )
+          );
+
+          scrollToResults();
+
+        }
       );
 
 
       categoryList.appendChild(
         button
       );
+
     }
   );
+
 }
 
 
-
 /* ============================================================
-   CATEGORY SELECT
+   CATEGORY FILTER
    ============================================================ */
 
 function renderCategoryFilter() {
 
+  if (!categoryFilter) {
+    return;
+  }
+
+
   categoryFilter.innerHTML =
-    `<option value="all">
-       Current Feed: All
-     </option>`;
+    `
+    <option value="all">
+      All Categories
+    </option>
+    `;
 
 
   categories.forEach(
@@ -626,16 +912,17 @@ function renderCategoryFilter() {
 
 
       option.textContent =
-        `Current Feed: ${category.name}`;
+        category.name;
 
 
       categoryFilter.appendChild(
         option
       );
+
     }
   );
-}
 
+}
 
 
 /* ============================================================
@@ -650,6 +937,10 @@ function selectFeed(
     feed;
 
 
+  currentPage =
+    1;
+
+
   if (
     feed === "all"
   ) {
@@ -658,16 +949,12 @@ function selectFeed(
       [...allItems];
 
 
-    currentFeedTitle.textContent =
-      "All Announcements";
+    if (currentFeedTitle) {
 
+      currentFeedTitle.textContent =
+        "All BSE Announcements";
 
-    currentFeedCount.textContent =
-      `${currentItems.length.toLocaleString()} announcements`;
-
-
-    categoryFilter.value =
-      "all";
+    }
 
   } else {
 
@@ -681,6 +968,7 @@ function selectFeed(
           ) {
 
             return true;
+
           }
 
 
@@ -693,30 +981,57 @@ function selectFeed(
             return item.categories.includes(
               feed
             );
+
           }
 
 
           return false;
+
         }
       );
 
 
-    currentFeedTitle.textContent =
-      feed;
+    if (currentFeedTitle) {
 
+      currentFeedTitle.textContent =
+        feed;
+
+    }
+
+  }
+
+
+  if (currentFeedCount) {
 
     currentFeedCount.textContent =
       `${currentItems.length.toLocaleString()} announcements`;
 
-
-    categoryFilter.value =
-      feed;
   }
 
 
-  /*
-   * Highlight selected button.
-   */
+  if (categoryFilter) {
+
+    categoryFilter.value =
+      feed === "all"
+        ? "all"
+        : feed;
+
+  }
+
+
+  updateCategoryHighlight();
+
+  applySearch();
+
+}
+
+
+/* ============================================================
+   CATEGORY HIGHLIGHT
+   ============================================================ */
+
+function updateCategoryHighlight() {
+
   document
     .querySelectorAll(
       ".category-button"
@@ -726,45 +1041,38 @@ function selectFeed(
 
         button.classList.toggle(
           "active",
-          (
-            feed ===
-            button.dataset.category
-          ) ||
-          (
-            feed === "all" &&
-            button.classList.contains(
-              "all-category"
-            )
-          )
+          button.dataset.category ===
+          currentFeed
         );
+
       }
     );
 
-
-  renderItems();
 }
 
 
-
 /* ============================================================
-   FILTER CURRENT FEED
+   SEARCH
    ============================================================ */
 
-function filterItems() {
+function applySearch() {
 
   const query =
-    searchInput.value
-      .trim()
-      .toLowerCase();
+    searchInput
+      ? searchInput.value
+          .trim()
+          .toLowerCase()
+      : "";
 
 
-  let filtered =
-    currentItems;
+  if (!query) {
 
+    displayedItems =
+      [...currentItems];
 
-  if (query) {
+  } else {
 
-    filtered =
+    displayedItems =
       currentItems.filter(
         item => {
 
@@ -775,11 +1083,13 @@ function filterItems() {
               item.title,
               item.description,
               item.category,
+
               ...(Array.isArray(
                 item.categories
               )
                 ? item.categories
                 : [])
+
             ]
               .filter(Boolean)
               .join(" ")
@@ -789,29 +1099,122 @@ function filterItems() {
           return text.includes(
             query
           );
+
         }
       );
+
   }
 
 
-  renderItems(
-    filtered
-  );
+  currentPage =
+    1;
+
+
+  renderPage();
+
 }
 
 
-
 /* ============================================================
-   RENDER ANNOUNCEMENTS
+   SORT
    ============================================================ */
 
-function renderItems(
-  suppliedItems
+function sortedItems(
+  items
 ) {
 
-  const items =
-    suppliedItems ||
-    currentItems;
+  return [...items].sort(
+    (a, b) => {
+
+      const da =
+        new Date(
+          a.pubDate ||
+          0
+        ).getTime();
+
+
+      const db =
+        new Date(
+          b.pubDate ||
+          0
+        ).getTime();
+
+
+      return db - da;
+
+    }
+  );
+
+}
+
+
+/* ============================================================
+   GROUP EXACT DUPLICATES
+   ============================================================ */
+
+function groupDuplicates(
+  items
+) {
+
+  const map =
+    new Map();
+
+
+  for (
+    const item of items
+  ) {
+
+    const key =
+      [
+        item.company || "",
+        item.title || "",
+        item.description || ""
+      ]
+        .join("|")
+        .trim()
+        .toLowerCase();
+
+
+    if (
+      !map.has(key)
+    ) {
+
+      map.set(
+        key,
+        {
+          item,
+          items: [item]
+        }
+      );
+
+    } else {
+
+      map
+        .get(key)
+        .items
+        .push(item);
+
+    }
+
+  }
+
+
+  return Array.from(
+    map.values()
+  );
+
+}
+
+
+/* ============================================================
+   RENDER CURRENT PAGE
+   ============================================================ */
+
+function renderPage() {
+
+  if (!results) {
+    return;
+  }
 
 
   results.innerHTML =
@@ -819,60 +1222,107 @@ function renderItems(
 
 
   if (
-    items.length === 0
+    displayedItems.length ===
+    0
   ) {
 
-    empty.classList.remove(
-      "hidden"
+    if (empty) {
+
+      empty.classList.remove(
+        "hidden"
+      );
+
+    }
+
+
+    renderPagination(
+      0,
+      0
     );
 
     return;
+
   }
 
 
-  empty.classList.add(
-    "hidden"
-  );
+  if (empty) {
+
+    empty.classList.add(
+      "hidden"
+    );
+
+  }
 
 
-  /*
-   * Newest first.
-   */
   const sorted =
-    [...items].sort(
-      (a, b) => {
-
-        const da =
-          new Date(
-            a.pubDate ||
-            0
-          ).getTime();
-
-
-        const db =
-          new Date(
-            b.pubDate ||
-            0
-          ).getTime();
-
-
-        return db - da;
-      }
+    sortedItems(
+      displayedItems
     );
 
 
-  sorted.forEach(
-    item => {
+  totalPages =
+    Math.max(
+      1,
+      Math.ceil(
+        sorted.length /
+        PAGE_SIZE
+      )
+    );
+
+
+  if (
+    currentPage >
+    totalPages
+  ) {
+
+    currentPage =
+      totalPages;
+
+  }
+
+
+  const start =
+    (
+      currentPage -
+      1
+    ) *
+    PAGE_SIZE;
+
+
+  const pageItems =
+    sorted.slice(
+      start,
+      start +
+      PAGE_SIZE
+    );
+
+
+  const groups =
+    groupDuplicates(
+      pageItems
+    );
+
+
+  groups.forEach(
+    group => {
 
       results.appendChild(
         createAnnouncementCard(
-          item
+          group.item,
+          group.items
         )
       );
+
     }
   );
-}
 
+
+  renderPagination(
+    sorted.length,
+    totalPages
+  );
+
+}
 
 
 /* ============================================================
@@ -880,7 +1330,8 @@ function renderItems(
    ============================================================ */
 
 function createAnnouncementCard(
-  item
+  item,
+  groupedItems = [item]
 ) {
 
   const card =
@@ -918,8 +1369,12 @@ function createAnnouncementCard(
     );
 
 
-  card.innerHTML = `
+  const duplicateCount =
+    groupedItems.length;
 
+
+  card.innerHTML =
+    `
     <div class="announcement-top">
 
       <div class="company">
@@ -931,11 +1386,13 @@ function createAnnouncementCard(
 
         ${
           item.scrip
-            ? `<span class="scrip">
-                 ${escapeHtml(
-                   item.scrip
-                 )}
-               </span>`
+            ? `
+              <span class="scrip">
+                ${escapeHtml(
+                  item.scrip
+                )}
+              </span>
+            `
             : ""
         }
 
@@ -944,9 +1401,11 @@ function createAnnouncementCard(
 
       ${
         whitelisted
-          ? `<span class="watch-badge">
-               ⭐ Whitelisted
-             </span>`
+          ? `
+            <span class="watch-badge">
+              ⭐ Whitelisted
+            </span>
+          `
           : ""
       }
 
@@ -959,11 +1418,13 @@ function createAnnouncementCard(
         .split(" • ")
         .map(
           category =>
-            `<span class="tag">
-               ${escapeHtml(
-                 category
-               )}
-             </span>`
+            `
+            <span class="tag">
+              ${escapeHtml(
+                category
+              )}
+            </span>
+            `
         )
         .join("")}
 
@@ -974,18 +1435,20 @@ function createAnnouncementCard(
 
       ${
         item.link
-          ? `<a
-               href="${escapeAttr(
-                 item.link
-               )}"
-               target="_blank"
-               rel="noopener noreferrer"
-             >
-               ${escapeHtml(
-                 item.title ||
-                 "BSE Announcement"
-               )}
-             </a>`
+          ? `
+            <a
+              href="${escapeAttr(
+                item.link
+              )}"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              ${escapeHtml(
+                item.title ||
+                "BSE Announcement"
+              )}
+            </a>
+          `
           : escapeHtml(
               item.title ||
               "BSE Announcement"
@@ -997,11 +1460,13 @@ function createAnnouncementCard(
 
     ${
       item.description
-        ? `<div class="description">
-             ${escapeHtml(
-               item.description
-             )}
-           </div>`
+        ? `
+          <div class="description">
+            ${escapeHtml(
+              item.description
+            )}
+          </div>
+        `
         : ""
     }
 
@@ -1015,22 +1480,145 @@ function createAnnouncementCard(
       </span>
 
 
-      ${
-        item.isFinancialResult
-          ? `<span class="result-badge">
-               Financial Result
-             </span>`
-          : ""
-      }
+      <span class="bottom-right">
+
+        ${
+          item.isFinancialResult
+            ? `
+              <span class="result-badge">
+                Financial Result
+              </span>
+            `
+            : ""
+        }
+
+
+        ${
+          duplicateCount > 1
+            ? `
+              <button
+                type="button"
+                class="duplicate-btn"
+              >
+                ${duplicateCount}
+                similar announcements
+              </button>
+            `
+            : ""
+        }
+
+      </span>
 
     </div>
 
-  `;
+
+    ${
+      duplicateCount > 1
+        ? `
+          <div
+            class="duplicate-list hidden"
+          >
+
+            ${groupedItems
+              .map(
+                (duplicate, index) => {
+
+                  return `
+                    <div
+                      class="duplicate-item"
+                    >
+
+                      <div>
+                        ${index + 1}.
+                        ${escapeHtml(
+                          formatDate(
+                            duplicate.pubDate
+                          )
+                        )}
+                      </div>
+
+
+                      ${
+                        duplicate.link
+                          ? `
+                            <a
+                              href="${escapeAttr(
+                                duplicate.link
+                              )}"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              Open announcement
+                            </a>
+                          `
+                          : ""
+                      }
+
+                    </div>
+                  `;
+
+                }
+              )
+              .join("")}
+
+          </div>
+        `
+        : ""
+    }
+
+    `;
+
+
+  if (
+    duplicateCount > 1
+  ) {
+
+    const button =
+      card.querySelector(
+        ".duplicate-btn"
+      );
+
+
+    const list =
+      card.querySelector(
+        ".duplicate-list"
+      );
+
+
+    if (
+      button &&
+      list
+    ) {
+
+      button.addEventListener(
+        "click",
+        function(event) {
+
+          event.preventDefault();
+
+          list.classList.toggle(
+            "hidden"
+          );
+
+
+          button.textContent =
+            list.classList.contains(
+              "hidden"
+            )
+              ? `${duplicateCount} similar announcements`
+              : "Hide similar announcements";
+
+        }
+      );
+
+    }
+
+  }
 
 
   return card;
-}
 
+}
 
 
 /* ============================================================
@@ -1044,6 +1632,10 @@ function isWhitelisted(
   return watchlist.some(
     watch => {
 
+      /*
+       * SCRIP = PRIMARY MATCH
+       */
+
       if (
         watch.scrip &&
         item.scrip
@@ -1052,13 +1644,18 @@ function isWhitelisted(
         return (
           String(
             watch.scrip
-          ) ===
+          ).trim() ===
           String(
             item.scrip
-          )
+          ).trim()
         );
+
       }
 
+
+      /*
+       * NAME = SECONDARY MATCH
+       */
 
       if (
         watch.name &&
@@ -1066,25 +1663,32 @@ function isWhitelisted(
       ) {
 
         return (
-          watch.name
+          String(
+            watch.name
+          )
             .trim()
             .toLowerCase() ===
-          item.company
+
+          String(
+            item.company
+          )
             .trim()
             .toLowerCase()
         );
+
       }
 
 
       return false;
+
     }
   );
+
 }
 
 
-
 /* ============================================================
-   ALERTS VIEW
+   ALERTS / SPECIAL BUNDLE
    ============================================================ */
 
 async function showAlerts() {
@@ -1098,11 +1702,19 @@ async function showAlerts() {
 
 
     alerts =
-      data.items || [];
+      Array.isArray(
+        data.items
+      )
+        ? data.items
+        : [];
 
 
-    alertCount.textContent =
-      alerts.length;
+    if (alertCount) {
+
+      alertCount.textContent =
+        alerts.length;
+
+    }
 
 
     currentFeed =
@@ -1110,15 +1722,31 @@ async function showAlerts() {
 
 
     currentItems =
-      alerts;
+      [...alerts];
 
 
-    currentFeedTitle.textContent =
-      "⭐ Alerts / Special Bundle";
+    if (currentFeedTitle) {
+
+      currentFeedTitle.textContent =
+        "⭐ Alerts / Special Bundle";
+
+    }
 
 
-    currentFeedCount.textContent =
-      `${alerts.length} alerts`;
+    if (currentFeedCount) {
+
+      currentFeedCount.textContent =
+        `${alerts.length} alerts`;
+
+    }
+
+
+    if (categoryFilter) {
+
+      categoryFilter.value =
+        "all";
+
+    }
 
 
     document
@@ -1133,15 +1761,16 @@ async function showAlerts() {
       );
 
 
-    categoryFilter.value =
-      "all";
+    currentPage =
+      1;
 
 
-    renderItems();
+    applySearch();
 
   } catch (error) {
 
     console.error(
+      "Alerts:",
       error
     );
 
@@ -1149,23 +1778,207 @@ async function showAlerts() {
     setStatus(
       "Could not load alerts."
     );
+
   }
+
 }
 
+
+/* ============================================================
+   PAGINATION
+   ============================================================ */
+
+function renderPagination(
+  total,
+  pages
+) {
+
+  let old =
+    document.getElementById(
+      "pagination"
+    );
+
+
+  if (!old) {
+
+    old =
+      document.createElement(
+        "div"
+      );
+
+
+    old.id =
+      "pagination";
+
+
+    old.className =
+      "pagination";
+
+
+    if (
+      results &&
+      results.parentNode
+    ) {
+
+      results.parentNode.insertBefore(
+        old,
+        results.nextSibling
+      );
+
+    }
+
+  }
+
+
+  old.innerHTML =
+    "";
+
+
+  if (
+    total === 0 ||
+    pages <= 1
+  ) {
+
+    return;
+
+  }
+
+
+  const previous =
+    document.createElement(
+      "button"
+    );
+
+
+  previous.type =
+    "button";
+
+
+  previous.textContent =
+    "‹ Previous";
+
+
+  previous.disabled =
+    currentPage <= 1;
+
+
+  previous.addEventListener(
+    "click",
+    () => {
+
+      if (
+        currentPage > 1
+      ) {
+
+        currentPage--;
+
+        renderPage();
+
+        scrollToResults();
+
+      }
+
+    }
+  );
+
+
+  old.appendChild(
+    previous
+  );
+
+
+  const info =
+    document.createElement(
+      "span"
+    );
+
+
+  info.textContent =
+    `Page ${currentPage} of ${pages}`;
+
+
+  old.appendChild(
+    info
+  );
+
+
+  const next =
+    document.createElement(
+      "button"
+    );
+
+
+  next.type =
+    "button";
+
+
+  next.textContent =
+    "Next ›";
+
+
+  next.disabled =
+    currentPage >= pages;
+
+
+  next.addEventListener(
+    "click",
+    () => {
+
+      if (
+        currentPage <
+        pages
+      ) {
+
+        currentPage++;
+
+        renderPage();
+
+        scrollToResults();
+
+      }
+
+    }
+  );
+
+
+  old.appendChild(
+    next
+  );
+
+}
+
+
+/* ============================================================
+   SCROLL
+   ============================================================ */
+
+function scrollToResults() {
+
+  const element =
+    document.getElementById(
+      "results"
+    );
+
+
+  if (!element) {
+    return;
+  }
+
+
+  element.scrollIntoView({
+    behavior:
+      "smooth",
+
+    block:
+      "start"
+  });
+
+}
 
 
 /* ============================================================
    HELPERS
    ============================================================ */
-
-function setStatus(
-  text
-) {
-
-  statusEl.textContent =
-    text;
-}
-
 
 function formatDate(
   value
@@ -1188,11 +2001,15 @@ function formatDate(
     )
   ) {
 
-    return value;
+    return String(
+      value
+    );
+
   }
 
 
   return date.toLocaleString();
+
 }
 
 
@@ -1223,6 +2040,7 @@ function escapeHtml(
       /'/g,
       "&#039;"
     );
+
 }
 
 
@@ -1233,100 +2051,177 @@ function escapeAttr(
   return escapeHtml(
     value
   );
-}
 
+}
 
 
 /* ============================================================
    EVENTS
    ============================================================ */
 
-document
-  .getElementById(
+const addButton =
+  document.getElementById(
     "addBtn"
-  )
-  .addEventListener(
-    "click",
-    addWatch
   );
 
 
-document
-  .getElementById(
+if (addButton) {
+
+  addButton.type =
+    "button";
+
+
+  addButton.addEventListener(
+    "click",
+    function(event) {
+
+      event.preventDefault();
+
+      event.stopPropagation();
+
+      addWatch();
+
+    }
+  );
+
+}
+
+
+const companyInput =
+  document.getElementById(
     "companyInput"
-  )
-  .addEventListener(
+  );
+
+
+if (companyInput) {
+
+  companyInput.addEventListener(
     "keydown",
-    event => {
+    function(event) {
 
       if (
         event.key ===
         "Enter"
       ) {
 
+        event.preventDefault();
+
+        event.stopPropagation();
+
         addWatch();
+
       }
+
     }
   );
 
+}
 
-document
-  .getElementById(
+
+const refreshBtn =
+  document.getElementById(
     "refreshBtn"
-  )
-  .addEventListener(
-    "click",
-    async () => {
+  );
 
-      await loadData();
+
+if (refreshBtn) {
+
+  refreshBtn.addEventListener(
+    "click",
+    async function(event) {
+
+      event.preventDefault();
 
       await loadWatchlist();
 
+      await loadData();
+
     }
   );
 
+}
 
-document
-  .getElementById(
+
+const allBtn =
+  document.getElementById(
     "allBtn"
-  )
-  .addEventListener(
+  );
+
+
+if (allBtn) {
+
+  allBtn.addEventListener(
     "click",
-    () =>
+    function(event) {
+
+      event.preventDefault();
+
       selectFeed(
         "all"
-      )
+      );
+
+      scrollToResults();
+
+    }
   );
 
+}
 
-document
-  .getElementById(
+
+const alertsBtn =
+  document.getElementById(
     "alertsBtn"
-  )
-  .addEventListener(
+  );
+
+
+if (alertsBtn) {
+
+  alertsBtn.addEventListener(
     "click",
-    showAlerts
+    function(event) {
+
+      event.preventDefault();
+
+      showAlerts();
+
+      scrollToResults();
+
+    }
   );
 
+}
 
-searchInput
-  .addEventListener(
+
+if (searchInput) {
+
+  searchInput.addEventListener(
     "input",
-    filterItems
+    function() {
+
+      applySearch();
+
+    }
   );
 
+}
 
-categoryFilter
-  .addEventListener(
+
+if (categoryFilter) {
+
+  categoryFilter.addEventListener(
     "change",
-    event => {
+    function(event) {
 
       selectFeed(
         event.target.value
       );
+
+      scrollToResults();
+
     }
   );
 
+}
 
 
 /* ============================================================
