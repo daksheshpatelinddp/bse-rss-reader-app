@@ -103,7 +103,7 @@ main {
 }
 
 /* ============================================================
-   WHITELIST & ACTIONS
+   WHITELIST & ACTIONS (UPDATED FOR HORIZONTAL SCROLL)
    ============================================================ */
 
 .panel-actions {
@@ -183,35 +183,63 @@ main {
   display: none;
 }
 
+/* --- HORIZONTAL SCROLLABLE ROW MODIFICATION --- */
+
 .whitelist {
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;          /* Keeps items on a single horizontal line */
+  overflow-x: auto;           /* Enables horizontal scrollbar */
+  overflow-y: hidden;
   gap: 8px;
   margin-top: 12px;
+  padding-bottom: 8px;        /* Space for the scrollbar */
+  -webkit-overflow-scrolling: touch; /* Smooth scrolling on iOS */
+  scroll-behavior: smooth;
+}
+
+/* Custom subtle scrollbar styling */
+.whitelist::-webkit-scrollbar {
+  height: 5px;
+}
+
+.whitelist::-webkit-scrollbar-track {
+  background: #f1f3f5;
+  border-radius: 4px;
+}
+
+.whitelist::-webkit-scrollbar-thumb {
+  background: #cbd1d8;
+  border-radius: 4px;
+}
+
+.whitelist::-webkit-scrollbar-thumb:hover {
+  background: #9aa2ab;
 }
 
 .watch-item {
-  display: flex;
+  flex: 0 0 auto;             /* Prevents item from shrinking or growing */
+  display: inline-flex;
   align-items: center;
   gap: 8px;
-  padding: 7px 8px 7px 11px;
+  padding: 7px 11px;
   border: 1px solid #d4d9df;
   border-radius: 20px;
   background: #f7f8f9;
   font-size: 13px;
   font-weight: 600;
+  white-space: nowrap;        /* Prevents company names from wrapping */
 }
 
 .remove-watch {
-  width: 23px;
-  height: 23px;
+  width: 21px;
+  height: 21px;
   padding: 0;
   border: 0;
   border-radius: 50%;
   background: #e2e5e8;
   cursor: pointer;
-  font-size: 16px;
-  line-height: 23px;
+  font-size: 15px;
+  line-height: 21px;
 }
 
 .remove-watch:hover {
