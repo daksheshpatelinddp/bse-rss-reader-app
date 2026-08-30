@@ -32,7 +32,7 @@ const currentFeedCount = document.getElementById("currentFeedCount");
 const totalCount = document.getElementById("totalCount");
 const alertCount = document.getElementById("alertCount");
 const watchCount = document.getElementById("watchCount");
-const whitelist = document.getElementById("whitelist");
+const whitelistEl = document.getElementById("whitelist");
 
 /* ============================================================
    API HELPER
@@ -198,15 +198,15 @@ async function removeWatch(index) {
 }
 
 function renderWatchlist() {
-  if (!whitelist) return;
+  if (!whitelistEl) return;
 
   watchlist = Array.isArray(watchlist) ? watchlist : [];
   if (watchCount) watchCount.textContent = watchlist.length;
 
-  whitelist.innerHTML = "";
+  whitelistEl.innerHTML = "";
 
   if (watchlist.length === 0) {
-    whitelist.innerHTML = `<div class="muted">No companies whitelisted yet.</div>`;
+    whitelistEl.innerHTML = `<div class="muted">No companies whitelisted yet.</div>`;
     return;
   }
 
@@ -214,7 +214,6 @@ function renderWatchlist() {
     const div = document.createElement("div");
     div.className = "watch-item";
 
-    // CLEAN LABEL FORMATTING (Removed generic "BSE" prefix)
     let label = "";
     if (item.scrip && item.name) {
       label = `${item.name} (${item.scrip})`;
@@ -229,10 +228,10 @@ function renderWatchlist() {
       <button type="button" class="remove-watch" data-index="${index}" title="Remove">×</button>
     `;
 
-    whitelist.appendChild(div);
+    whitelistEl.appendChild(div);
   });
 
-  whitelist.querySelectorAll(".remove-watch").forEach((button) => {
+  whitelistEl.querySelectorAll(".remove-watch").forEach((button) => {
     button.addEventListener("click", (event) => {
       event.preventDefault();
       event.stopPropagation();
@@ -600,6 +599,7 @@ function setupWatchlistHandlers() {
   const companyInput = document.getElementById("companyInput");
   const clearBtn = document.getElementById("clearWatchlistBtn");
   const fileInput = document.getElementById("fileUploadInput");
+  const fileLabel = document.querySelector(".file-upload-label");
 
   if (addButton) {
     addButton.addEventListener("click", (e) => {
@@ -625,6 +625,13 @@ function setupWatchlistHandlers() {
     clearBtn.addEventListener("click", (e) => {
       e.preventDefault();
       clearAllWatchlist();
+    });
+  }
+
+  if (fileLabel && fileInput) {
+    fileLabel.addEventListener("click", (e) => {
+      e.preventDefault();
+      fileInput.click();
     });
   }
 
