@@ -97,16 +97,21 @@ async function loadWatchlist() {
 }
 
 async function saveWatchlist() {
-  const data = await api("/watchlist", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ watchlist }),
-  });
+  try {
+    const data = await api("/watchlist", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ watchlist: Array.isArray(watchlist) ? watchlist : [] }),
+    });
 
-  if (data && Array.isArray(data.watchlist)) {
-    watchlist = data.watchlist;
+    if (data && Array.isArray(data.watchlist)) {
+      watchlist = data.watchlist;
+    }
+    renderWatchlist();
+  } catch (error) {
+    console.error("Save watchlist error:", error);
+    throw error;
   }
-  renderWatchlist();
 }
 
 async function processBulkInput(rawText) {
@@ -156,7 +161,7 @@ async function processBulkInput(rawText) {
 }
 
 async function clearAllWatchlist() {
-  if (watchlist.length === 0) return;
+  if (!watchlist || watchlist.length === 0) return;
 
   if (!confirm("Are you sure you want to clear all whitelisted companies?")) {
     return;
@@ -165,16 +170,16 @@ async function clearAllWatchlist() {
   const oldWatchlist = [...watchlist];
   watchlist = [];
   renderWatchlist();
+  setStatus("Clearing whitelist...");
 
   try {
-    setStatus("Clearing whitelist...");
     await saveWatchlist();
     setStatus("Whitelist cleared successfully.");
   } catch (error) {
     console.error("Clear watchlist error:", error);
     watchlist = oldWatchlist;
     renderWatchlist();
-    setStatus("Could not clear whitelist.");
+    setStatus("Could not clear whitelist from server.");
   }
 }
 
