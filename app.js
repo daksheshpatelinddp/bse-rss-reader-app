@@ -1,10 +1,10 @@
 /*
  * BSE RSS READER - CLIENT APP
- * Features: Watchlist management, category filtering, search, 
- *           duplicate grouping, and dual top/bottom pagination.
+ * Features: Watchlist management (with comma-separated splitting), category filtering,
+ * search, duplicate grouping, and dual top/bottom pagination.
  */
 
-const WORKER_URL = "https://bse-rss-reader.daksheshpatelin.workers.dev"; // Update if your worker URL differs
+const WORKER_URL = "https://bse-rss-reader.daksheshpatelin.workers.dev";
 const ITEMS_PER_PAGE = 50;
 
 let rawAnnouncements = [];
@@ -26,13 +26,11 @@ document.addEventListener("DOMContentLoaded", () => {
 });
 
 function initEventListeners() {
-  // Refresh button
   document.getElementById("refreshBtn").addEventListener("click", () => {
     fetchAnnouncements();
     fetchCategories();
   });
 
-  // Watchlist controls
   document.getElementById("addWatchBtn").addEventListener("click", addWatchlistItem);
   document.getElementById("watchInput").addEventListener("keypress", (e) => {
     if (e.key === "Enter") addWatchlistItem();
@@ -40,18 +38,15 @@ function initEventListeners() {
   document.getElementById("clearWatchlistBtn").addEventListener("click", clearWatchlist);
   document.getElementById("csvFileInput").addEventListener("change", handleFileUpload);
 
-  // Filter & Feed Select
   document.getElementById("searchInput").addEventListener("input", applyFilters);
   document.getElementById("feedSelect").addEventListener("change", fetchAnnouncements);
   document.getElementById("showAllBtn").addEventListener("click", () => {
     selectCategory("ALL");
   });
 
-  // Top Pagination Controls
   document.getElementById("prevBtnTop").addEventListener("click", () => goToPage(currentPage - 1));
   document.getElementById("nextBtnTop").addEventListener("click", () => goToPage(currentPage + 1));
 
-  // Bottom Pagination Controls
   document.getElementById("prevBtnBottom").addEventListener("click", () => goToPage(currentPage - 1));
   document.getElementById("nextBtnBottom").addEventListener("click", () => goToPage(currentPage + 1));
 }
@@ -79,12 +74,10 @@ function goToPage(page) {
 function updatePaginationUI() {
   const pageText = `Page ${currentPage} of ${totalPages || 1}`;
 
-  // Update Top Bar
   document.getElementById("pageInfoTop").textContent = pageText;
   document.getElementById("prevBtnTop").disabled = currentPage <= 1;
   document.getElementById("nextBtnTop").disabled = currentPage >= totalPages;
 
-  // Update Bottom Bar
   document.getElementById("pageInfoBottom").textContent = pageText;
   document.getElementById("prevBtnBottom").disabled = currentPage <= 1;
   document.getElementById("nextBtnBottom").disabled = currentPage >= totalPages;
@@ -125,7 +118,7 @@ async function fetchCategories() {
 }
 
 /* ============================================================
-   WATCHLIST OPERATIONS
+   WATCHLIST OPERATIONS (COMMA-SEPARATED SUPPORT)
    ============================================================ */
 
 async function loadWatchlist() {
@@ -159,14 +152,22 @@ function addWatchlistItem() {
   const value = input.value.trim();
   if (!value) return;
 
-  const isScrip = /^\d{6}$/.test(value);
-  const newItem = isScrip ? { scrip: value, name: "" } : { scrip: "", name: value };
+  // Splits comma-separated inputs (e.g., RELIANCE, TCS, 500325) into separate items
+  const items = value.split(",").map(item => item.trim()).filter(Boolean);
 
-  if (!watchlist.some(w => (w.scrip && w.scrip === newItem.scrip) || (w.name && w.name.toLowerCase() === newItem.name.toLowerCase()))) {
-    watchlist.push(newItem);
-    saveWatchlist();
-  }
+  items.forEach(clean => {
+    const isScrip = /^\d{6}$/.test(clean);
+    const newItem = isScrip ? { scrip: clean, name: "" } : { scrip: "", name: clean };
 
+    if (!watchlist.some(w => 
+      (w.scrip && newItem.scrip && w.scrip === newItem.scrip) || 
+      (w.name && newItem.name && w.name.toLowerCase() === newItem.name.toLowerCase())
+    )) {
+      watchlist.push(newItem);
+    }
+  });
+
+  saveWatchlist();
   input.value = "";
 }
 
@@ -190,14 +191,17 @@ function handleFileUpload(e) {
   reader.onload = function(event) {
     const lines = event.target.result.split(/\r?\n/);
     lines.forEach(line => {
-      const clean = line.trim();
-      if (clean) {
+      const entries = line.split(",").map(item => item.trim()).filter(Boolean);
+      entries.forEach(clean => {
         const isScrip = /^\d{6}$/.test(clean);
         const newItem = isScrip ? { scrip: clean, name: "" } : { scrip: "", name: clean };
-        if (!watchlist.some(w => (w.scrip && w.scrip === newItem.scrip) || (w.name && w.name.toLowerCase() === newItem.name.toLowerCase()))) {
+        if (!watchlist.some(w => 
+          (w.scrip && newItem.scrip && w.scrip === newItem.scrip) || 
+          (w.name && newItem.name && w.name.toLowerCase() === newItem.name.toLowerCase())
+        )) {
           watchlist.push(newItem);
         }
-      }
+      });
     });
     saveWatchlist();
   };
@@ -277,12 +281,10 @@ function applyFilters() {
   const searchText = document.getElementById("searchInput").value.toLowerCase().trim();
 
   filteredAnnouncements = rawAnnouncements.filter(item => {
-    // Category match
     if (currentCategory !== "ALL" && !item.categories?.includes(currentCategory)) {
       return false;
     }
 
-    // Search match
     if (searchText) {
       const title = String(item.title || "").toLowerCase();
       const desc = String(item.description || "").toLowerCase();
