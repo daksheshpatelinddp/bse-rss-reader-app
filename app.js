@@ -103,7 +103,7 @@ async function saveWatchlist() {
     body: JSON.stringify({ watchlist }),
   });
 
-  if (Array.isArray(data.watchlist)) {
+  if (data && Array.isArray(data.watchlist)) {
     watchlist = data.watchlist;
   }
   renderWatchlist();
