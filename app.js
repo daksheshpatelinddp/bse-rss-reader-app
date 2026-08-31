@@ -173,49 +173,6 @@ async function loadWatchlist() {
 
 
 /* ============================================================
-   SAVE WATCHLIST TO CLOUDFLARE KV
-   ============================================================ */
-
-async function saveWatchlist() {
-
-  const data =
-    await api(
-      "/watchlist",
-      {
-        method:
-          "POST",
-
-        headers: {
-          "Content-Type":
-            "application/json"
-        },
-
-        body:
-          JSON.stringify({
-            watchlist:
-              watchlist
-          })
-      }
-    );
-
-
-  if (
-    Array.isArray(
-      data.watchlist
-    )
-  ) {
-
-    watchlist =
-      data.watchlist;
-
-  }
-
-
-  renderWatchlist();
-}
-
-
-/* ============================================================
    ADD WATCHLIST COMPANY
    ============================================================ */
 
@@ -246,121 +203,57 @@ async function addWatch() {
     return;
   }
 
+  let payload = {};
 
-  /*
-   * PRIMARY METHOD:
-   *
-   * Six digits = BSE scrip.
-   */
+  if (/^\d{6}$/.test(value)) {
+    const alreadyExists = watchlist.some(
+      item => String(item.scrip || "").trim() === value
+    );
 
-  if (
-    /^\d{6}$/.test(
-      value
-    )
-  ) {
-
-    const alreadyExists =
-      watchlist.some(
-        item =>
-          String(
-            item.scrip || ""
-          ).trim() ===
-          value
-      );
-
-
-    if (
-      alreadyExists
-    ) {
-
-      setStatus(
-        "This scrip is already whitelisted."
-      );
-
-      input.value =
-        "";
-
+    if (alreadyExists) {
+      setStatus("This scrip is already whitelisted.");
+      input.value = "";
       return;
     }
 
-
-    /*
-     * Store the scrip only.
-     * Worker will use the scrip
-     * for exact matching.
-     */
-
-    watchlist.push({
-      scrip:
-        value
-    });
-
+    payload = { scrip: value };
   } else {
+    const name = value.toLowerCase();
 
-    /*
-     * Name matching is still supported
-     * for compatibility.
-     */
+    const alreadyExists = watchlist.some(
+      item => String(item.name || "").trim().toLowerCase() === name
+    );
 
-    const name =
-      value.toLowerCase();
-
-
-    const alreadyExists =
-      watchlist.some(
-        item =>
-          String(
-            item.name || ""
-          )
-            .trim()
-            .toLowerCase() ===
-          name
-      );
-
-
-    if (
-      alreadyExists
-    ) {
-
-      setStatus(
-        "This company is already whitelisted."
-      );
-
-      input.value =
-        "";
-
+    if (alreadyExists) {
+      setStatus("This company is already whitelisted.");
+      input.value = "";
       return;
     }
 
-
-    watchlist.push({
-      name:
-        value
-    });
-
+    payload = { name: value };
   }
-
-
-  /*
-   * Keep value until save succeeds.
-   * This prevents losing the entry if
-   * the network request fails.
-   */
 
   try {
 
-    setStatus(
-      "Saving whitelist..."
-    );
+    setStatus("Saving whitelist...");
 
-    await saveWatchlist();
+    const response = await api("/watchlist", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(payload)
+    });
 
-    input.value =
-      "";
+    if (Array.isArray(response.watchlist)) {
+      watchlist = response.watchlist;
+    }
 
-    setStatus(
-      "Whitelist saved successfully."
-    );
+    renderWatchlist();
+
+    input.value = "";
+
+    setStatus("Whitelist saved successfully.");
 
   } catch (error) {
 
@@ -369,54 +262,7 @@ async function addWatch() {
       error
     );
 
-
-    /*
-     * Undo the locally added item
-     * if Cloudflare rejected the save.
-     */
-
-    watchlist =
-      watchlist.filter(
-        (item, index) => {
-
-          /*
-           * Remove the newest
-           * matching item only.
-           */
-
-          if (
-            /^\d{6}$/.test(
-              value
-            )
-          ) {
-
-            return !(
-              index ===
-                watchlist.length - 1 &&
-              String(
-                item.scrip || ""
-              ) === value
-            );
-
-          }
-
-
-          return !(
-            index ===
-              watchlist.length - 1 &&
-            String(
-              item.name || ""
-            )
-              .toLowerCase() ===
-              value.toLowerCase()
-          );
-
-        }
-      );
-
-
     renderWatchlist();
-
 
     setStatus(
       "Could not save whitelist."
@@ -450,19 +296,13 @@ async function removeWatch(
     return;
   }
 
+  const target = watchlist[index];
+  const scripToRemove = target ? target.scrip : null;
 
-  const oldWatchlist =
-    [...watchlist];
-
-
-  watchlist.splice(
-    index,
-    1
-  );
-
-
-  renderWatchlist();
-
+  if (!scripToRemove) {
+    setStatus("Invalid scrip to remove.");
+    return;
+  }
 
   try {
 
@@ -470,7 +310,20 @@ async function removeWatch(
       "Saving whitelist..."
     );
 
-    await saveWatchlist();
+    const response = await api(
+      `/watchlist?scrip=${encodeURIComponent(scripToRemove)}`,
+      {
+        method: "DELETE"
+      }
+    );
+
+    if (Array.isArray(response.watchlist)) {
+      watchlist = response.watchlist;
+    } else {
+      watchlist.splice(index, 1);
+    }
+
+    renderWatchlist();
 
     setStatus(
       "Whitelist updated."
@@ -482,14 +335,6 @@ async function removeWatch(
       "Whitelist remove:",
       error
     );
-
-
-    /*
-     * Restore if saving failed.
-     */
-
-    watchlist =
-      oldWatchlist;
 
     renderWatchlist();
 
@@ -656,10 +501,10 @@ async function loadData() {
 
     allItems =
       Array.isArray(
-        announcementData.items
+        announcementData.announcements
       )
-        ? announcementData.items
-        : [];
+        ? announcementData.announcements
+        : (Array.isArray(announcementData.items) ? announcementData.items : []);
 
 
     const categoryData =
