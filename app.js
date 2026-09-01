@@ -16,6 +16,20 @@ let currentPage = 1;
 let totalPages = 1;
 
 /* ============================================================
+   HELPERS
+   ============================================================ */
+
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
+}
+
+/* ============================================================
    INITIALIZATION & EVENT LISTENERS
    ============================================================ */
 
@@ -268,7 +282,7 @@ function renderWatchlist() {
 
   container.innerHTML = watchlist.map((item, index) => `
     <div class="watch-item">
-      <span>${item.name || item.scrip}</span>
+      <span>${escapeHtml(item.name || item.scrip)}</span>
       <button class="remove-watch" onclick="removeWatchlistItem(${index})">&times;</button>
     </div>
   `).join("");
@@ -296,8 +310,8 @@ function renderCategories(categories) {
 
   categories.forEach(cat => {
     html += `
-      <button class="category-button ${currentCategory === cat.name ? 'active' : ''}" onclick="selectCategory('${cat.name}')">
-        <span>${cat.name}</span>
+      <button class="category-button ${currentCategory === cat.name ? 'active' : ''}" onclick="selectCategory('${escapeHtml(cat.name)}')">
+        <span>${escapeHtml(cat.name)}</span>
         <b>${cat.count}</b>
       </button>
     `;
@@ -411,15 +425,20 @@ function renderAnnouncements() {
     const bseLink = getBseDirectLink(item);
 
     const categoryTags = (item.categories || [item.category || "General"])
-      .map(c => `<span class="tag">${c}</span>`)
+      .map(c => `<span class="tag">${escapeHtml(c)}</span>`)
       .join("");
+
+    const parsedDate = item.pubDate ? new Date(item.pubDate) : null;
+    const formattedDate = (parsedDate && !isNaN(parsedDate.getTime())) 
+      ? parsedDate.toLocaleString() 
+      : "Recently";
 
     return `
       <article class="announcement-card">
         <div class="announcement-top">
           <div>
-            <span class="company">${item.company || "Unknown Company"}</span>
-            ${item.scrip ? `<span class="scrip">${item.scrip}</span>` : ""}
+            <span class="company">${escapeHtml(item.company || "Unknown Company")}</span>
+            ${item.scrip ? `<span class="scrip">${escapeHtml(item.scrip)}</span>` : ""}
           </div>
           ${isWhitelisted ? '<span class="watch-badge">⭐ Watchlist</span>' : ""}
         </div>
@@ -429,15 +448,15 @@ function renderAnnouncements() {
         </div>
 
         <h3>
-          <a href="${bseLink}" target="_blank" rel="noopener noreferrer">
-            ${item.title || "Untitled Announcement"}
+          <a href="${escapeHtml(bseLink)}" target="_blank" rel="noopener noreferrer">
+            ${escapeHtml(item.title || "Untitled Announcement")}
           </a>
         </h3>
 
-        ${item.description ? `<div class="description">${item.description}</div>` : ""}
+        ${item.description ? `<div class="description">${escapeHtml(item.description)}</div>` : ""}
 
         <div class="announcement-bottom">
-          <span>📅 ${item.pubDate ? new Date(item.pubDate).toLocaleString() : "Recently"}</span>
+          <span>📅 ${formattedDate}</span>
           <div class="bottom-right">
             ${item.isFinancialResult ? '<span class="result-badge">📊 Financial Result</span>' : ""}
           </div>
