@@ -1,7 +1,8 @@
 /*
  * BSE RSS READER - CLIENT APP
  * Features: Watchlist management, category filtering, search, 
- *           duplicate grouping, and dual top/bottom pagination.
+ *           duplicate grouping, dual top/bottom pagination,
+ *           and Telegram/ntfy notification toggles.
  */
 
 const WORKER_URL = "https://bse-rss-reader.daksheshpatelin.workers.dev"; // Update if your worker URL differs
@@ -20,12 +21,17 @@ let totalPages = 1;
 
 document.addEventListener("DOMContentLoaded", () => {
   initEventListeners();
+  loadNotificationSettings();
   loadWatchlist();
   fetchCategories();
   fetchAnnouncements();
 });
 
 function initEventListeners() {
+  // Notification Toggles
+  document.getElementById("telegramToggle").addEventListener("change", saveNotificationSettings);
+  document.getElementById("ntfyToggle").addEventListener("change", saveNotificationSettings);
+
   // Refresh button
   document.getElementById("refreshBtn").addEventListener("click", () => {
     fetchAnnouncements();
@@ -54,6 +60,40 @@ function initEventListeners() {
   // Bottom Pagination Controls
   document.getElementById("prevBtnBottom").addEventListener("click", () => goToPage(currentPage - 1));
   document.getElementById("nextBtnBottom").addEventListener("click", () => goToPage(currentPage + 1));
+}
+
+/* ============================================================
+   NOTIFICATION SETTINGS OPERATIONS
+   ============================================================ */
+
+async function loadNotificationSettings() {
+  try {
+    const res = await fetch(`${WORKER_URL}/notification-settings`);
+    const data = await res.json();
+    if (data.ok && data.settings) {
+      document.getElementById("telegramToggle").checked = !!data.settings.telegram;
+      document.getElementById("ntfyToggle").checked = !!data.settings.ntfy;
+    }
+  } catch (err) {
+    console.error("Error loading notification settings:", err);
+  }
+}
+
+async function saveNotificationSettings() {
+  const settings = {
+    telegram: document.getElementById("telegramToggle").checked,
+    ntfy: document.getElementById("ntfyToggle").checked
+  };
+
+  try {
+    await fetch(`${WORKER_URL}/notification-settings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(settings)
+    });
+  } catch (err) {
+    console.error("Error saving notification settings:", err);
+  }
 }
 
 /* ============================================================
