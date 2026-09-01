@@ -10,7 +10,7 @@ body {
   margin: 0;
   padding: 0;
   font-family: Arial, Helvetica, sans-serif;
-  font-size: 15px;
+  font-size: 22.5px;
   background: #f3f5f7;
   color: #202124;
 }
@@ -35,14 +35,14 @@ body {
 
 .topbar h1 {
   margin: 0;
-  font-size: 21px;
+  font-size: 31.5px;
   line-height: 1.25;
 }
 
 .subtitle {
   margin-top: 4px;
   color: #68717b;
-  font-size: 13px;
+  font-size: 19.5px;
 }
 
 .refresh-btn {
@@ -53,7 +53,7 @@ body {
   background: #ffffff;
   color: #202124;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 21px;
 }
 
 .refresh-btn:hover {
@@ -89,7 +89,7 @@ main {
 
 .panel-title h2 {
   margin: 0;
-  font-size: 17px;
+  font-size: 25.5px;
 }
 
 .panel-title > span {
@@ -98,7 +98,7 @@ main {
   border-radius: 20px;
   background: #edf0f3;
   text-align: center;
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 700;
 }
 
@@ -116,7 +116,7 @@ main {
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 600;
   cursor: pointer;
   user-select: none;
@@ -145,7 +145,7 @@ main {
   background: #ffffff;
   color: #d9534f;
   cursor: pointer;
-  font-size: 12px;
+  font-size: 18px;
   font-weight: 600;
 }
 
@@ -166,7 +166,7 @@ main {
   border: 1px solid #cbd1d8;
   border-radius: 8px;
   outline: none;
-  font-size: 14px;
+  font-size: 21px;
 }
 
 .add-row input:focus {
@@ -181,7 +181,7 @@ main {
   background: #202124;
   color: #ffffff;
   cursor: pointer;
-  font-size: 14px;
+  font-size: 21px;
   font-weight: 600;
 }
 
@@ -196,7 +196,7 @@ main {
 .file-upload-label {
   display: inline-block;
   color: #555d66;
-  font-size: 12px;
+  font-size: 18px;
   cursor: pointer;
   text-decoration: underline;
 }
@@ -251,7 +251,7 @@ main {
   border: 1px solid #d4d9df;
   border-radius: 20px;
   background: #f7f8f9;
-  font-size: 13px;
+  font-size: 19.5px;
   font-weight: 600;
   white-space: nowrap;        /* Prevents company names from wrapping */
 }
@@ -264,7 +264,7 @@ main {
   border-radius: 50%;
   background: #e2e5e8;
   cursor: pointer;
-  font-size: 15px;
+  font-size: 22.5px;
   line-height: 21px;
 }
 
@@ -274,7 +274,7 @@ main {
 
 .muted {
   color: #737b84;
-  font-size: 13px;
+  font-size: 19.5px;
 }
 
 /* ============================================================
@@ -311,7 +311,7 @@ main {
   color: #252a30;
   cursor: pointer;
   text-align: left;
-  font-size: 13px;
+  font-size: 19.5px;
 }
 
 .category-button:hover {
@@ -331,7 +331,7 @@ main {
   border-radius: 12px;
   background: #edf0f3;
   color: #555d66;
-  font-size: 11px;
+  font-size: 16.5px;
 }
 
 .category-button.active {
@@ -361,7 +361,7 @@ main {
 }
 
 .feed-title {
-  font-size: 20px;
+  font-size: 30px;
   font-weight: 700;
   line-height: 1.3;
 }
@@ -369,7 +369,7 @@ main {
 .feed-count {
   margin-top: 4px;
   color: #6d757e;
-  font-size: 13px;
+  font-size: 19.5px;
 }
 
 .all-btn {
@@ -379,7 +379,7 @@ main {
   border-radius: 8px;
   background: #ffffff;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 19.5px;
 }
 
 .filter-row {
@@ -396,7 +396,7 @@ main {
   background: #ffffff;
   color: #202124;
   outline: none;
-  font-size: 14px;
+  font-size: 21px;
 }
 
 .filter-row input {
@@ -414,7 +414,7 @@ main {
   gap: 10px;
   margin: 3px 2px 12px;
   color: #69717a;
-  font-size: 12px;
+  font-size: 18px;
 }
 
 /* ============================================================
@@ -448,7 +448,7 @@ main {
 
 .company {
   color: #252a30;
-  font-size: 15px;
+  font-size: 22.5px;
   font-weight: 700;
   line-height: 1.4;
 }
@@ -460,7 +460,7 @@ main {
   border-radius: 5px;
   background: #edf0f3;
   color: #59616a;
-  font-size: 11px;
+  font-size: 16.5px;
   font-weight: 600;
   vertical-align: middle;
 }
@@ -471,7 +471,7 @@ main {
   border-radius: 12px;
   background: #fff1b5;
   color: #675300;
-  font-size: 11px;
+  font-size: 16.5px;
   font-weight: 700;
 }
 
@@ -487,13 +487,13 @@ main {
   border-radius: 12px;
   background: #eef1f4;
   color: #59616d;
-  font-size: 11px;
+  font-size: 16.5px;
   line-height: 1.2;
 }
 
 .announcement-card h3 {
   margin: 10px 0 7px;
-  font-size: 15px;
+  font-size: 22.5px;
   line-height: 1.45;
 }
 
@@ -510,7 +510,7 @@ main {
   max-height: 90px;
   overflow: hidden;
   color: #5e666f;
-  font-size: 13px;
+  font-size: 19.5px;
   line-height: 1.5;
   word-break: break-word;
 }
@@ -524,7 +524,7 @@ main {
   padding-top: 9px;
   border-top: 1px solid #edf0f2;
   color: #707881;
-  font-size: 12px;
+  font-size: 18px;
 }
 
 .bottom-right {
@@ -540,7 +540,7 @@ main {
   border-radius: 12px;
   background: #e7f4ea;
   color: #286a38;
-  font-size: 10px;
+  font-size: 15px;
   font-weight: 700;
 }
 
@@ -551,7 +551,7 @@ main {
   background: #f7f8f9;
   color: #4f5861;
   cursor: pointer;
-  font-size: 10px;
+  font-size: 15px;
 }
 
 .duplicate-btn:hover {
@@ -572,7 +572,7 @@ main {
   padding: 7px 0;
   border-bottom: 1px solid #f0f1f2;
   color: #656d75;
-  font-size: 12px;
+  font-size: 18px;
 }
 
 .duplicate-item:last-child {
@@ -608,7 +608,7 @@ main {
   background: #ffffff;
   color: #202124;
   cursor: pointer;
-  font-size: 13px;
+  font-size: 19.5px;
 }
 
 .pagination button:hover:not(:disabled) {
@@ -622,7 +622,7 @@ main {
 
 .pagination span {
   color: #555d66;
-  font-size: 13px;
+  font-size: 19.5px;
   font-weight: 600;
 }
 
@@ -633,7 +633,7 @@ main {
   border-radius: 10px;
   color: #727a83;
   text-align: center;
-  font-size: 14px;
+  font-size: 21px;
 }
 
 .hidden {
@@ -646,7 +646,7 @@ main {
 
 @media (max-width: 700px) {
   body {
-    font-size: 14px;
+    font-size: 21px;
   }
 
   .topbar {
@@ -655,16 +655,16 @@ main {
   }
 
   .topbar h1 {
-    font-size: 18px;
+    font-size: 27px;
   }
 
   .subtitle {
-    font-size: 11px;
+    font-size: 16.5px;
   }
 
   .refresh-btn {
     padding: 8px 9px;
-    font-size: 12px;
+    font-size: 18px;
   }
 
   main {
@@ -678,7 +678,7 @@ main {
   }
 
   .panel-title h2 {
-    font-size: 15px;
+    font-size: 22.5px;
   }
 
   .category-list {
@@ -689,7 +689,7 @@ main {
   .category-button {
     min-height: 42px;
     padding: 8px;
-    font-size: 12px;
+    font-size: 18px;
   }
 
   .current-feed {
@@ -698,7 +698,7 @@ main {
   }
 
   .feed-title {
-    font-size: 18px;
+    font-size: 27px;
   }
 
   .all-btn {
@@ -729,7 +729,7 @@ main {
   }
 
   .company {
-    font-size: 14px;
+    font-size: 21px;
   }
 
   .watch-badge {
