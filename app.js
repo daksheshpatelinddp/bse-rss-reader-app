@@ -273,6 +273,23 @@ function matchesWatchlistClient(item) {
   });
 }
 
+function getBseDirectLink(item) {
+  var rawLink = String(item.link || "").trim();
+  if (rawLink.indexOf("AttachLive") !== -1 || rawLink.indexOf("AttachHis") !== -1) {
+    var fileName = rawLink.split("/").pop();
+    if (fileName) {
+      return "https://www.bseindia.com/xml-data/corpfiling/AttachLive/" + fileName;
+    }
+  }
+  if (rawLink.indexOf("http") === 0) {
+    return rawLink;
+  }
+  if (item.scrip) {
+    return "https://www.bseindia.com/stock-share-price/" + item.scrip;
+  }
+  return "https://www.bseindia.com";
+}
+
 function applyFilters() {
   const searchText = document.getElementById("searchInput").value.toLowerCase().trim();
 
@@ -321,9 +338,7 @@ function renderAnnouncements() {
 
   container.innerHTML = pageItems.map(item => {
     const isWhitelisted = matchesWatchlistClient(item);
-    const bseLink = item.scrip 
-      ? `https://www.bseindia.com/stock-share-price/${item.scrip}`
-      : (item.link || "https://www.bseindia.com");
+    const bseLink = getBseDirectLink(item);
 
     const categoryTags = (item.categories || [item.category || "General"])
       .map(c => `<span class="tag">${c}</span>`)
