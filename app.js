@@ -156,17 +156,23 @@ async function saveWatchlist() {
 
 function addWatchlistItem() {
   const input = document.getElementById("watchInput");
-  const value = input.value.trim();
-  if (!value) return;
+  const rawValue = input.value.trim();
+  if (!rawValue) return;
 
-  const isScrip = /^\d{6}$/.test(value);
-  const newItem = isScrip ? { scrip: value, name: "" } : { scrip: "", name: value };
+  const entries = rawValue.split(",");
+  entries.forEach(entry => {
+    const clean = entry.trim();
+    if (clean) {
+      const isScrip = /^\d{6}$/.test(clean);
+      const newItem = isScrip ? { scrip: clean, name: "" } : { scrip: "", name: clean };
 
-  if (!watchlist.some(w => (w.scrip && w.scrip === newItem.scrip) || (w.name && w.name.toLowerCase() === newItem.name.toLowerCase()))) {
-    watchlist.push(newItem);
-    saveWatchlist();
-  }
+      if (!watchlist.some(w => (w.scrip && w.scrip === newItem.scrip) || (w.name && w.name.toLowerCase() === newItem.name.toLowerCase()))) {
+        watchlist.push(newItem);
+      }
+    }
+  });
 
+  saveWatchlist();
   input.value = "";
 }
 
@@ -190,14 +196,17 @@ function handleFileUpload(e) {
   reader.onload = function(event) {
     const lines = event.target.result.split(/\r?\n/);
     lines.forEach(line => {
-      const clean = line.trim();
-      if (clean) {
-        const isScrip = /^\d{6}$/.test(clean);
-        const newItem = isScrip ? { scrip: clean, name: "" } : { scrip: "", name: clean };
-        if (!watchlist.some(w => (w.scrip && w.scrip === newItem.scrip) || (w.name && w.name.toLowerCase() === newItem.name.toLowerCase()))) {
-          watchlist.push(newItem);
+      const entries = line.split(",");
+      entries.forEach(entry => {
+        const clean = entry.trim();
+        if (clean) {
+          const isScrip = /^\d{6}$/.test(clean);
+          const newItem = isScrip ? { scrip: clean, name: "" } : { scrip: "", name: clean };
+          if (!watchlist.some(w => (w.scrip && w.scrip === newItem.scrip) || (w.name && w.name.toLowerCase() === newItem.name.toLowerCase()))) {
+            watchlist.push(newItem);
+          }
         }
-      }
+      });
     });
     saveWatchlist();
   };
