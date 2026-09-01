@@ -108,6 +108,7 @@ async function fetchAnnouncements() {
     document.getElementById("lastUpdatedText").textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
     
     applyFilters();
+    fetchCategories();
   } catch (err) {
     console.error("Error fetching announcements:", err);
     document.getElementById("feedCount").textContent = "Failed to load announcements.";
@@ -240,8 +241,13 @@ function renderWatchlist() {
 function renderCategories(categories) {
   const container = document.getElementById("categoryList");
   const totalCount = rawAnnouncements.length;
+  const whitelistedCount = rawAnnouncements.filter(matchesWatchlistClient).length;
 
   let html = `
+    <button class="category-button special ${currentCategory === 'WHITELISTED' ? 'active' : ''}" onclick="selectCategory('WHITELISTED')">
+      <span>⭐ Whitelisted Scrips</span>
+      <b>${whitelistedCount}</b>
+    </button>
     <button class="category-button all-category ${currentCategory === 'ALL' ? 'active' : ''}" onclick="selectCategory('ALL')">
       <span>All Announcements</span>
       <b>${totalCount}</b>
@@ -262,7 +268,13 @@ function renderCategories(categories) {
 
 function selectCategory(category) {
   currentCategory = category;
-  document.getElementById("feedTitle").textContent = category === "ALL" ? "All Announcements" : category;
+  if (category === "WHITELISTED") {
+    document.getElementById("feedTitle").textContent = "⭐ Whitelisted Scrips";
+  } else if (category === "ALL") {
+    document.getElementById("feedTitle").textContent = "All Announcements";
+  } else {
+    document.getElementById("feedTitle").textContent = category;
+  }
   
   const showAllBtn = document.getElementById("showAllBtn");
   if (category === "ALL") {
@@ -308,8 +320,12 @@ function applyFilters() {
   const searchText = document.getElementById("searchInput").value.toLowerCase().trim();
 
   filteredAnnouncements = rawAnnouncements.filter(item => {
-    // Category match
-    if (currentCategory !== "ALL" && !item.categories?.includes(currentCategory)) {
+    // Whitelisted special bundle match
+    if (currentCategory === "WHITELISTED") {
+      if (!matchesWatchlistClient(item)) return false;
+    }
+    // Standard Category match
+    else if (currentCategory !== "ALL" && !item.categories?.includes(currentCategory)) {
       return false;
     }
 
