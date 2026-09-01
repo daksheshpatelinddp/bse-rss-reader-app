@@ -214,6 +214,11 @@ function handleFileUpload(e) {
 }
 
 function renderWatchlist() {
+  const countEl = document.getElementById("watchlistCount");
+  if (countEl) {
+    countEl.textContent = `(${watchlist.length})`;
+  }
+
   const container = document.getElementById("whitelistContainer");
   if (watchlist.length === 0) {
     container.innerHTML = '<span class="muted">No whitelisted companies added yet.</span>';
