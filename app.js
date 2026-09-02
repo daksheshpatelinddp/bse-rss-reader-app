@@ -433,6 +433,11 @@ function renderAnnouncements() {
       ? parsedDate.toLocaleString() 
       : "Recently";
 
+    const parsedFetchDate = item.fetchedAt ? new Date(item.fetchedAt) : null;
+    const formattedFetchDate = (parsedFetchDate && !isNaN(parsedFetchDate.getTime()))
+      ? parsedFetchDate.toLocaleString()
+      : "N/A";
+
     return `
       <article class="announcement-card">
         <div class="announcement-top">
@@ -456,7 +461,7 @@ function renderAnnouncements() {
         ${item.description ? `<div class="description">${escapeHtml(item.description)}</div>` : ""}
 
         <div class="announcement-bottom">
-          <span>📅 ${formattedDate}</span>
+          <span>📅 Pub: ${formattedDate} | ⚡ Fetched: ${formattedFetchDate}</span>
           <div class="bottom-right">
             ${item.isFinancialResult ? '<span class="result-badge">📊 Financial Result</span>' : ""}
           </div>
