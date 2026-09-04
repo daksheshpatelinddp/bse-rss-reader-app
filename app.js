@@ -150,17 +150,30 @@ function updatePaginationUI() {
 
 async function fetchAnnouncements() {
   const feedType = document.getElementById("feedSelect").value;
-  const endpoint = feedType === "results" ? "/monitor" : "/bse-announcements";
 
   document.getElementById("feedCount").textContent = "Loading announcements...";
 
   try {
-    const res = await fetch(`${WORKER_URL}${endpoint}`);
+    // Always load from the day-store (fast + complete). /monitor is only for the
+    // background checker and no longer returns the full list (CPU limit).
+    const res = await fetch(`${WORKER_URL}/bse-announcements`);
     const data = await res.json();
 
-    rawAnnouncements = data.items || data.newItems || [];
+    let items = data.items || [];
+
+    // Client-side filter when user picks "Financial Results"
+    if (feedType === "results") {
+      items = items.filter(
+        (i) =>
+          i.isFinancialResult === true ||
+          (i.categories && i.categories.includes("Financial Results")) ||
+          (i.category && String(i.category).toLowerCase().includes("result"))
+      );
+    }
+
+    rawAnnouncements = items;
     document.getElementById("lastUpdatedText").textContent = `Last updated: ${new Date().toLocaleTimeString()}`;
-    
+
     applyFilters();
     fetchCategories();
   } catch (err) {
