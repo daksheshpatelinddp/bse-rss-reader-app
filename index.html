@@ -3,60 +3,113 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BSE Alert Monitor</title>
+  <title>BSE RSS Reader</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
+
   <header class="topbar">
     <div>
-      <h1>BSE Alert Monitor</h1>
-      <div class="subtitle">Fastest alerts · Watchlist driven</div>
+      <h1>BSE RSS Reader</h1>
+      <div class="subtitle">Live Announcements & Financial Results</div>
     </div>
-    <div class="header-actions">
-      <button class="btn secondary" id="checkNowBtn" title="Trigger one poll now">⚡ Check now</button>
-      <button class="btn" id="refreshBtn">🔄 Refresh</button>
-    </div>
+    <button class="refresh-btn" id="refreshBtn">🔄 Refresh</button>
   </header>
 
-  <main class="layout">
-    <aside class="sidebar">
-      <section class="card">
-        <h2>Notifications</h2>
-        <label class="toggle-row">
-          <span>Telegram</span>
-          <input type="checkbox" id="telegramToggle" checked>
-        </label>
-        <label class="toggle-row">
-          <span>ntfy</span>
-          <input type="checkbox" id="ntfyToggle" checked>
-        </label>
-        <p class="muted small" id="lastCheckText">Last check: —</p>
-      </section>
-
-      <section class="card">
-        <h2>Watchlist <span id="watchlistCount" class="muted">(0)</span></h2>
-        <div class="add-row">
-          <input type="text" id="watchInput" placeholder="Scrip code or name">
-          <button class="btn small" id="addWatchBtn">Add</button>
-        </div>
-        <div class="add-row">
-          <label class="file-label">
-            Import CSV
-            <input type="file" id="csvFileInput" accept=".csv,.txt">
-          </label>
-          <button class="btn small danger" id="clearWatchlistBtn">Clear</button>
-        </div>
-        <div id="whitelistContainer" class="watch-list"></div>
-      </section>
-    </aside>
-
-    <section class="content">
-      <div class="content-header">
-        <h2 id="feedTitle">Recent alerts</h2>
-        <span id="feedCount" class="muted">Loading…</span>
+  <main>
+    <!-- NOTIFICATION SETTINGS PANEL -->
+    <section class="panel">
+      <div class="panel-title">
+        <h2>Notification Settings</h2>
       </div>
-      <div id="results" class="results"></div>
+      <div class="notify-toggle-group">
+        <label class="toggle-label">
+          <input type="checkbox" id="telegramToggle">
+          <span>Enable Telegram Notifications</span>
+        </label>
+        <label class="toggle-label">
+          <input type="checkbox" id="ntfyToggle">
+          <span>Enable ntfy Notifications</span>
+        </label>
+      </div>
     </section>
+
+    <!-- WATCHLIST / WHITELIST PANEL -->
+    <section class="panel">
+      <div class="panel-title">
+        <h2>Whitelisted Scrips <span id="watchlistCount">(0)</span></h2>
+        <div class="panel-actions">
+          <button class="clear-btn" id="clearWatchlistBtn">Clear All</button>
+        </div>
+      </div>
+
+      <div class="add-row">
+        <input type="text" id="watchInput" placeholder="Enter Company Name or 6-digit Scrip Code...">
+        <button id="addWatchBtn">Add</button>
+      </div>
+
+      <div class="file-upload-row">
+        <label for="csvFileInput" class="file-upload-label">📁 Import Watchlist (CSV/TXT)</label>
+        <input type="file" id="csvFileInput" class="hidden-file-input" accept=".csv, .txt">
+      </div>
+
+      <div id="whitelistContainer" class="whitelist">
+        <!-- Watchlist items will render here horizontally -->
+      </div>
+    </section>
+
+    <!-- CATEGORIES PANEL -->
+    <section class="panel">
+      <div class="panel-title">
+        <h2>Categories</h2>
+      </div>
+      <div id="categoryList" class="category-list">
+        <!-- Category buttons render here -->
+      </div>
+    </section>
+
+    <!-- CURRENT FEED & FILTER SECTION -->
+    <section class="panel">
+      <div class="current-feed">
+        <div>
+          <div id="feedTitle" class="feed-title">All Announcements</div>
+          <div id="feedCount" class="feed-count">Loading announcements...</div>
+        </div>
+        <button id="showAllBtn" class="all-btn hidden">Show All Categories</button>
+      </div>
+
+      <div class="filter-row">
+        <input type="text" id="searchInput" placeholder="Search title, description, or scrip code...">
+        <select id="feedSelect">
+          <option value="announcements">Corporate Announcements</option>
+          <option value="results">Financial Results</option>
+        </select>
+      </div>
+
+      <div class="status-bar">
+        <span id="lastUpdatedText">Last updated: --</span>
+        <span id="matchingCountText"></span>
+      </div>
+    </section>
+
+    <!-- TOP PAGINATION CONTROLS -->
+    <div id="paginationTop" class="pagination">
+      <button id="prevBtnTop">Previous</button>
+      <span id="pageInfoTop">Page 1 of 1</span>
+      <button id="nextBtnTop">Next</button>
+    </div>
+
+    <!-- ANNOUNCEMENTS RESULTS -->
+    <section id="results" class="results">
+      <!-- 50 Announcements render here -->
+    </section>
+
+    <!-- BOTTOM PAGINATION CONTROLS -->
+    <div id="paginationBottom" class="pagination">
+      <button id="prevBtnBottom">Previous</button>
+      <span id="pageInfoBottom">Page 1 of 1</span>
+      <button id="nextBtnBottom">Next</button>
+    </div>
   </main>
 
   <script src="app.js"></script>
